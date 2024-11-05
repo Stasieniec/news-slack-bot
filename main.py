@@ -24,8 +24,7 @@ def fetch_page_content_requests_html(url):
     session = HTMLSession()
     try:
         response = session.get(url)
-        # Render JavaScript - this may take a few seconds
-        response.html.render(timeout=20)
+        response.html.render(timeout=20, chromium_args=["--no-sandbox"], executable_path="/usr/bin/chromium-browser")
         html_content = response.html.html
         return html_content
     except Exception as e:
