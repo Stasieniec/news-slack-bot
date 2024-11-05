@@ -11,12 +11,26 @@ from openai import OpenAI
 import apis
 from datetime import datetime, timedelta
 import re
+from requests_html import HTMLSession
 
 # Initialize the OpenAI client
 client = OpenAI(
     api_key=apis.OPEN_AI_TR,
 )
 NEWS_API_KEY = apis.NEWS
+
+
+def fetch_page_content_requests_html(url):
+    session = HTMLSession()
+    try:
+        response = session.get(url)
+        # Render JavaScript - this may take a few seconds
+        response.html.render(timeout=20)
+        html_content = response.html.html
+        return html_content
+    except Exception as e:
+        print(f"Failed to fetch page content at {url} using requests_html: {e}")
+        return None
 
 
 def clean_authors(authors_list):
@@ -172,7 +186,7 @@ def scrape_article_content(url):
 
 def scrape_comments(url):
     # Fetch the page content (use Selenium if necessary)
-    html_content = fetch_page_content_selenium(url)
+    html_content = fetch_page_content_requests_html(url)
 
     if not html_content:
         print(f"No HTML content fetched for {url}")
