@@ -281,12 +281,13 @@ def format_articles_for_slack(articles_data):
     return '\n---\n'.join(messages)
 
 
-def main_function():
+def main_function(from_date = '', to_date ='' ):
     keywords = ['"movie recommendations"', '"netflix recommendations"', '"streaming services"', '"netflix"', '"hbo max"']
     x = 2  # Number of articles per keyword
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
-    from_date = yesterday
-    to_date = yesterday
+    if from_date == '' or to_date == '':
+        from_date = yesterday
+        to_date = yesterday
 
     articles_data = []
 
