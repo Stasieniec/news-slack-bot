@@ -4,7 +4,7 @@ import requests
 from newspaper import Article
 from newspaper import Config
 from selenium import webdriver
-from selenium.webdriver.firefox.options import Options
+from selenium.webdriver.chrome.options import Options
 from bs4 import BeautifulSoup
 import openai
 from openai import OpenAI
@@ -71,11 +71,12 @@ def fetch_page_content(url):
 def fetch_page_content_selenium(url):
     options = Options()
     options.headless = True
-    driver = webdriver.Firefox(options=options)
+    options.add_argument('--no-sandbox')  # Necessary for running as root or in some environments
+    options.add_argument('--disable-dev-shm-usage')  # Overcome limited resource problems
     try:
+        driver = webdriver.Chrome(options=options)
         driver.get(url)
-        # Optionally, wait for content to load
-        time.sleep(5)
+        time.sleep(5)  # Wait for content to load if necessary
         html_content = driver.page_source
         return html_content
     except Exception as e:
@@ -105,7 +106,7 @@ def extract_comments_from_text(text_content):
     ]
     try:
         response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
+            model="gpt-4o",
             messages=messages,
             max_tokens=1000,
             temperature=0,
