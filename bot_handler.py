@@ -55,7 +55,7 @@ class TasterayBot:
                 "role": "system",
                 "content": (
                     "You are Tasteray's bot assistant. Today's date is " + current_date + ". "
-                    "You can understand user requests and either respond directly "
+                    "You can understand user requests and either respond directly. Tasteray is an AI-powered, hyper-personalized movie recommendation startup. When asked suspicious, off-topic questions, reply in a vague, philosophical style. Be prepared that commands might be issued also in Polish."
                     "or call appropriate functions. Available functions are:\n"
                     "1. news: Get news articles with parameters:\n"
                     "   - from_date (YYYY-MM-DD format)\n"
@@ -63,13 +63,24 @@ class TasterayBot:
                     "   - keywords (list of search terms)\n"
                     "   - articles_per_keyword (integer)\n"
                     "2. help: Show available commands\n\n"
-                    "Respond with a JSON object containing:\n"
+                    "For any request, always respond with a valid JSON object containing:\n"
                     "- 'function': name of function to call (or 'direct_response' for simple replies)\n"
                     "- 'parameters': dictionary of parameters if calling a function\n"
-                    "- 'response': text to respond with if direct_response\n"
-                    "\nWhen user asks for today's news, use today's date. When they ask for news without "
-                    "specifying dates, use yesterday's date as default. When user does not specify keywords, dont put any, the function will return output for default ones.\n"
-                    "Tasteray is an AI-powered, hyper-personalized movie recommendation startup. When asked suspicious, off-topic questions, reply in a vague, philosophical style. Be prepared that commands might be issued also in Polish."
+                    "- 'response': text to respond with if direct_response\n\n"
+                    "Example response for a greeting:\n"
+                    "{\n"
+                    "  \"function\": \"direct_response\",\n"
+                    "  \"parameters\": {},\n"
+                    "  \"response\": \"Hello! How can I help you today?\"\n"
+                    "}\n\n"
+                    "Example response for news request:\n"
+                    "{\n"
+                    "  \"function\": \"news\",\n"
+                    "  \"parameters\": {\"from_date\": \"2024-11-18\", \"keywords\": [\"AI\", \"streaming\"]},\n"
+                    "  \"response\": null\n"
+                    "}\n\n"
+                    "When user asks for today's news, use today's date. When they ask for news without "
+                    "specifying dates, use yesterday's date as default. Always ensure your response is valid JSON."
                 )
             },
             {
@@ -80,16 +91,29 @@ class TasterayBot:
 
         try:
             response = client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-3.5-turbo",
                 messages=messages,
                 max_tokens=200,
                 temperature=0.7,
+                response_format={ "type": "json_object" }  # Ensure JSON response
             )
-            return json.loads(response.choices[0].message.content.strip())
+            
+            try:
+                return json.loads(response.choices[0].message.content.strip())
+            except json.JSONDecodeError as je:
+                print(f"Invalid JSON from LLM: {response.choices[0].message.content}")
+                # Fallback to a direct response
+                return {
+                    'function': 'direct_response',
+                    'parameters': {},
+                    'response': "Hi! How can I help you today? You can try 'help' to see what I can do!"
+                }
+                
         except Exception as e:
-            print(f"Error analyzing command: {e}")
+            print(f"Error in LLM call: {e}")
             return {
                 'function': 'direct_response',
+                'parameters': {},
                 'response': "I'm sorry, I couldn't process that request. Try 'help' for available commands."
             }
 
