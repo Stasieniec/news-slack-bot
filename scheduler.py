@@ -13,7 +13,7 @@ def send_daily_digest():
     try:
         message = main_function(from_date=yesterday, to_date=yesterday)
         response = client.chat_postMessage(
-            channel="#insights-bot-test",
+            channel="#insights-bot",
             text=message,
             unfurl_links=False
         )
