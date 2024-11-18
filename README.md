@@ -23,7 +23,7 @@ sudo apt install -y python3-venv tmux git
 
 1. Clone the repository:
 ```bash
-git clone <your-repository-url>
+git clone https://github.com/Stasieniec/news-slack-bot.git
 cd news-slack-bot
 ```
 
