@@ -1,3 +1,5 @@
+# news_collector.py
+
 import requests
 from newspaper import Article
 from newspaper import Config

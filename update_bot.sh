@@ -2,7 +2,8 @@
 
 echo "Updating News Slack Bot..."
 
-cd /home/wasil/Desktop/news-slack-bot
+BOT_DIR="/home/wasil/Desktop/news-slack-bot"
+cd $BOT_DIR
 
 # Pull latest changes
 git pull
