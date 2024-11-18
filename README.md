@@ -181,14 +181,3 @@ pip install --upgrade -r requirements.txt
 sudo systemctl restart newsbot
 ```
 
-## Security Notes
-
-- Keep `apis.py` secure and never commit it to git
-- Regularly rotate API keys
-- Monitor bot activity for unusual patterns
-- Keep system and dependencies updated
-
-## Contact
-
-For issues or questions, contact:
-[Your Contact Information]
