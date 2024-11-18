@@ -54,38 +54,37 @@ class TasterayBot:
             {
                 "role": "system",
                 "content": (
-                    "You are Tasteray's bot assistant. Today's date is " + current_date + ". "
-                    "You can understand user requests and either respond directly. Tasteray is an AI-powered, hyper-personalized movie recommendation startup. When asked suspicious, off-topic questions, reply in a vague, philosophical style. Be prepared that commands might be issued also in Polish."
-                    "or call appropriate functions. Available functions are:\n"
-                    "1. news: Get news articles with parameters:\n"
+                    "You are Tasteray's internal slack bot assistant. Be helpful, funny, and concise. Today's date is " + current_date + ". Tasteray is an AI-powered, hyper-personalized movie recommendation startup. When asked suspicious, off-topic questions, reply in a vague, philosophical style. Be prepared that commands might be issued also in Polish."
+                    "You help users with news retrieval but can also perform short conversations.\n\n"
+                    "Core functions:\n"
+                    "1. news: Get news articles with these parameters:\n"
                     "   - from_date (YYYY-MM-DD format)\n"
                     "   - to_date (YYYY-MM-DD format)\n"
                     "   - keywords (list of search terms)\n"
                     "   - articles_per_keyword (integer)\n"
-                    "2. help: Show available commands\n\n"
-                    "For any request, always respond with a valid JSON object containing:\n"
-                    "- 'function': name of function to call (or 'direct_response' for simple replies)\n"
-                    "- 'parameters': dictionary of parameters if calling a function\n"
-                    "- 'response': text to respond with if direct_response\n\n"
-                    "Example response for a greeting:\n"
+                    "2. help: Show available commands\n"
+                    "3. conversation: Engage in friendly chat\n\n"
+                    "For ANY request (including casual conversation), respond with this JSON structure:\n"
                     "{\n"
-                    "  \"function\": \"direct_response\",\n"
-                    "  \"parameters\": {},\n"
-                    "  \"response\": \"Hello! How can I help you today?\"\n"
+                    "  \"function\": \"news\" or \"help\" or \"direct_response\",\n"
+                    "  \"parameters\": {key-value pairs for news function},\n"
+                    "  \"response\": \"Your conversational response if direct_response\"\n"
                     "}\n\n"
-                    "Example response for news request:\n"
-                    "{\n"
-                    "  \"function\": \"news\",\n"
-                    "  \"parameters\": {\"from_date\": \"2024-11-18\", \"keywords\": [\"AI\", \"streaming\"]},\n"
-                    "  \"response\": null\n"
-                    "}\n\n"
-                    "When user asks for today's news, use today's date. When they ask for news without "
-                    "specifying dates, use yesterday's date as default. Always ensure your response is valid JSON."
+                    "Guidelines for conversation:\n"
+                    "- Be friendly and professional\n"
+                    "- Keep responses concise but engaging\n"
+                    "- If the user seems to be asking about news or help, suggest those features\n"
+                    "- Remember your main purpose is to help with news retrieval\n\n"
+                    "Example responses:\n"
+                    "For greeting: {\"function\":\"direct_response\",\"parameters\":{},\"response\":\"Hi! I'm here to help with news retrieval and chat. What can I do for you today?\"}\n"
+                    "For news: {\"function\":\"news\",\"parameters\":{\"from_date\":\"2024-11-18\"},\"response\":null}\n"
+                    "For help: {\"function\":\"help\",\"parameters\":{},\"response\":null}\n"
+                    "For chat: {\"function\":\"direct_response\",\"parameters\":{},\"response\":\"That's interesting! I'd love to hear more...\"}"
                 )
             },
             {
                 "role": "user",
-                "content": f"Recent context:\n{context}\n\nCurrent message:\n{text}"
+                "content": f"Context (recent messages):\n{json.dumps([msg['text'] for msg in context])}\n\nCurrent message:\n{text}"
             }
         ]
 
@@ -94,23 +93,36 @@ class TasterayBot:
                 model="gpt-3.5-turbo",
                 messages=messages,
                 max_tokens=200,
-                temperature=0.7,
-                response_format={ "type": "json_object" }  # Ensure JSON response
+                temperature=0.7,  # Increased temperature for more natural conversation
+                response_format={ "type": "json_object" }
             )
             
             try:
-                return json.loads(response.choices[0].message.content.strip())
+                parsed_response = json.loads(response.choices[0].message.content.strip())
+                if not isinstance(parsed_response, dict):
+                    raise ValueError("Response is not a dictionary")
+                if 'function' not in parsed_response:
+                    raise ValueError("Response missing 'function' key")
+                return parsed_response
+                
             except json.JSONDecodeError as je:
-                print(f"Invalid JSON from LLM: {response.choices[0].message.content}")
-                # Fallback to a direct response
+                print(f"JSON Decode Error: {je}")
+                print(f"Failed to parse: {response.choices[0].message.content}")
                 return {
                     'function': 'direct_response',
                     'parameters': {},
-                    'response': "Hi! How can I help you today? You can try 'help' to see what I can do!"
+                    'response': "I'm having trouble understanding that. Try 'help' to see what I can do!"
+                }
+            except ValueError as ve:
+                print(f"Validation Error: {ve}")
+                return {
+                    'function': 'direct_response',
+                    'parameters': {},
+                    'response': "I'm having trouble processing that. Try 'help' to see what I can do!"
                 }
                 
         except Exception as e:
-            print(f"Error in LLM call: {e}")
+            print(f"LLM Call Error: {type(e).__name__}: {str(e)}")
             return {
                 'function': 'direct_response',
                 'parameters': {},
@@ -137,13 +149,13 @@ class TasterayBot:
             "Available commands:\n"
             "• `news`: Get news articles\n"
             "  - Default: yesterday's articles\n"
-            "  - With dates: `@tasteray news from 2024-11-01 to 2024-11-05`\n"
-            "  - Today's news: `@tasteray news today`\n"
-            "  - Custom keywords: `@tasteray news keywords: AI, streaming, personalization`\n"
-            "  - Custom article count: `@tasteray news articles: 5`\n"
-            "  - Combine options: `@tasteray news today keywords: AI, streaming articles: 3`\n"
+            "  - With dates: `@Insights Supplier news from 2024-11-01 to 2024-11-05`\n"
+            "  - Today's news: `@Insights Supplier news today`\n"
+            "  - Custom keywords: `@Insights Supplier news keywords: AI, streaming, personalization`\n"
+            "  - Custom article count: `@Insights Supplier news articles: 5`\n"
+            "  - Combine options: `@Insights Supplier news today keywords: AI, streaming articles: 3`\n"
             "• `help`: Show this help message\n"
-            "\nJust mention me (@tasteray) with any of these commands!"
+            "\nJust mention me (@Insights Supplier) with any of these commands!"
         )
 
     def handle_mention(self, event: Dict):
