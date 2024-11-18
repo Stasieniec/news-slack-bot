@@ -16,6 +16,8 @@ client = OpenAI(
     api_key=apis.OPEN_AI_TR,
 )
 NEWS_API_KEY = apis.NEWS
+DEFAULT_KEYWORDS = ['"movie recommendations"', '"netflix recommendations"', '"streaming services"', '"netflix"', '"hbo max"']
+DEFAULT_ARTICLES_PER_KEYWORD = 2
 
 def clean_authors(authors_list):
     cleaned_authors = []
@@ -198,7 +200,7 @@ def analyze_tasteray_implications(text, title):
 def format_articles_for_slack(articles_data):
     """Format articles data for Slack message with the new structure."""
     if not articles_data:
-        return "No relevant articles found today."
+        return "No relevant articles found for the specified period."
     
     # Start with the friendly introduction
     message_parts = [generate_friendly_intro()]
@@ -230,12 +232,16 @@ def format_articles_for_slack(articles_data):
         except:
             date_str = data['publish_date']
         
-        # Create source link
+        # Create source link with unfurl_links=False
         source_domain = get_domain_from_url(data['source'])
         source_link = f"<{data['source']}|read at {source_domain}>"
         
         # Combine metadata
         metadata = f"{date_str} • {authors_str} • {source_link}"
+        
+        # Add keyword information if custom keywords were used
+        if data.get('keyword') not in [k.strip('"') for k in DEFAULT_KEYWORDS]:
+            metadata += f" • Keyword: {data['keyword']}"
         
         # Combine all parts with proper spacing
         article_message = f"{title}\n{description}{tasteray_section}\n{metadata}"
@@ -265,11 +271,24 @@ def generate_friendly_intro():
 
 
 
-def main_function(from_date='', to_date=''):
-    keywords = ['"movie recommendations"', '"netflix recommendations"', '"streaming services"', '"netflix"', '"hbo max"']
-    x = 2  # Number of articles per keyword
+def main_function(from_date='', to_date='', keywords=None, articles_per_keyword=None):
+    """
+    Main function that supports custom keywords and article counts.
+    
+    Args:
+        from_date (str): Start date in YYYY-MM-DD format
+        to_date (str): End date in YYYY-MM-DD format
+        keywords (list): Optional list of keywords to search for
+        articles_per_keyword (int): Optional number of articles per keyword
+    """
+    # Use default keywords if none provided
+    keywords = keywords or DEFAULT_KEYWORDS
+    # Use default article count if none provided
+    x = articles_per_keyword or DEFAULT_ARTICLES_PER_KEYWORD
+    
+    # Handle dates
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
-    if from_date == '' or to_date == '':
+    if not from_date and not to_date:
         from_date = yesterday
         to_date = yesterday
 
@@ -294,7 +313,6 @@ def main_function(from_date='', to_date=''):
 
                 main_theses = extract_main_theses(article_data['text'])
                 
-                # First check if the article is relevant for Tasteray
                 if check_tasteray_relevance(article_data['text'], article_data['title']):
                     tasteray_implications = analyze_tasteray_implications(article_data['text'], article_data['title'])
                 else:
@@ -314,4 +332,5 @@ def main_function(from_date='', to_date=''):
             except Exception as e:
                 print(f"An error occurred while processing article: {e}")
                 continue
+                
     return format_articles_for_slack(articles_data)
