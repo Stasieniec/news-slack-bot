@@ -13,7 +13,7 @@ def send_daily_digest():
     try:
         message = main_function(from_date=yesterday, to_date=yesterday)
         response = client.chat_postMessage(
-            channel="#insights-bot",
+            channel="#insights-bot-testing",
             text=message,
             unfurl_links=False
         )
@@ -24,7 +24,7 @@ def send_daily_digest():
 def run_scheduler():
     scheduler = BlockingScheduler()
     # Run every day at 9:00 AM
-    scheduler.add_job(send_daily_digest, 'cron', hour=9, minute=0)
+    scheduler.add_job(send_daily_digest, 'cron', hour=22, minute=19)
     
-    print("Scheduler started. Daily digest will be sent at 9:00 AM.")
+    print("Scheduler started. Daily digest will be sent at 15:00 AM.")
     scheduler.start()
