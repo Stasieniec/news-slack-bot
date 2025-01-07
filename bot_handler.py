@@ -327,10 +327,13 @@ class TasterayBot:
                 is_bot = bool(msg.get('bot_id'))
                 user_name = self._get_user_name(user_id)
                 
+                # Convert user mentions in the message text
+                text = self._convert_user_mentions(msg.get('text', ''))
+                
                 # Include all messages for proper context
                 message_data = {
                     'user': user_name,
-                    'text': msg.get('text', ''),
+                    'text': text,
                     'ts': msg.get('ts', ''),
                     'is_bot': is_bot
                 }
@@ -384,6 +387,9 @@ class TasterayBot:
                 for msg in messages:
                     user_id = msg.get('user', 'unknown')
                     msg['user_name'] = self._get_user_name(user_id)
+                    # Convert user mentions in the message text and ensure user_name is used
+                    msg['text'] = self._convert_user_mentions(msg.get('text', ''))
+                    msg['user'] = msg['user_name']  # Replace user ID with name
                 
                 all_messages.extend(messages)
                 
@@ -776,8 +782,9 @@ class TasterayBot:
         """
         formatted_messages = []
         for msg in messages:
-            user = msg.get('user', 'unknown')
-            text = msg.get('text', '')
+            user = msg.get('user_name', msg.get('user', 'unknown'))
+            # Convert any user mentions in the text
+            text = self._convert_user_mentions(msg.get('text', ''))
             ts = datetime.fromtimestamp(float(msg.get('ts', 0))).strftime('%Y-%m-%d %H:%M:%S')
             formatted_messages.append(f"[{ts}] {user}: {text}")
 
@@ -1251,3 +1258,22 @@ class TasterayBot:
         except SlackApiError as e:
             logger.error(f"Error deleting last message: {e}")
             raise
+
+    def _convert_user_mentions(self, text: str) -> str:
+        """Convert user IDs in message text to display names."""
+        if not text:
+            return text
+            
+        # Match both direct mentions <@U1234567> and user references in text U1234567
+        user_mentions = set(re.finditer(r'<@(U[A-Z0-9]+)>', text))
+        user_mentions.update(re.finditer(r'\b(U[A-Z0-9]{8,})\b', text))
+        new_text = text
+        
+        for match in user_mentions:
+            user_id = match.group(1)
+            user_name = self._get_user_name(user_id)
+            # Replace both formats with the display name
+            new_text = new_text.replace(f'<@{user_id}>', f'*{user_name}*')
+            new_text = new_text.replace(user_id, f'*{user_name}*')
+        
+        return new_text
