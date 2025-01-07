@@ -1,4 +1,4 @@
-from apscheduler.schedulers.blocking import BlockingScheduler
+import time
 from datetime import datetime, timedelta
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
@@ -9,11 +9,11 @@ def send_daily_digest():
     """Send daily digest of yesterday's articles."""
     client = WebClient(token=apis.SLACK_TOKEN)
     yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
-    
+
     try:
         message = main_function(from_date=yesterday, to_date=yesterday)
         response = client.chat_postMessage(
-            channel="#insights-bot-testing",
+            channel="#insights-bot",
             text=message,
             unfurl_links=False
         )
@@ -22,9 +22,5 @@ def send_daily_digest():
         print(f"Error sending daily digest: {e}")
 
 def run_scheduler():
-    scheduler = BlockingScheduler()
-    # Run every day at 9:00 AM
-    scheduler.add_job(send_daily_digest, 'cron', hour=22, minute=19)
-    
-    print("Scheduler started. Daily digest will be sent at 15:00 AM.")
-    scheduler.start()
+    while True:
+        now = datetime.now()
