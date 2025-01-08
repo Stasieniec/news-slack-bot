@@ -1,46 +1,89 @@
 # app.py
 
-from slack_bolt import App
-from slack_bolt.adapter.socket_mode import SocketModeHandler
-import apis
+from slack_bolt.async_app import AsyncApp
+from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 from bot_handler import TasterayBot
+import apis
 import logging
 
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
 )
 logger = logging.getLogger(__name__)
 
-app = App(token=apis.SLACK_TOKEN)
+# Initialize the Slack app
+app = AsyncApp(token=apis.SLACK_TOKEN)
+
+# Initialize the bot
 bot = TasterayBot()
 
-@app.event("app_home_opened")
-def handle_app_home_opened(event, say):
-    """Handle when a user opens the app home tab."""
-    user_id = event["user"]
-    logger.info(f"User {user_id} opened the home tab")
-    bot.publish_home_tab(user_id)
-
 @app.event("app_mention")
-def handle_mentions(event, say):
-    """Handle when the bot is mentioned in channels."""
-    bot.handle_message(event, is_mention=True)
+async def handle_mention(event, say):
+    """Handle mentions of the bot."""
+    # Validate event
+    if not event or 'text' not in event or 'channel' not in event:
+        logger.error(f"Invalid mention event: {event}")
+        return
+        
+    logger.info(f"Handling mention from user {event.get('user')}")
+    try:
+        # Remove the bot mention from the text
+        text = event['text']
+        text = text.split('>', 1)[1].strip() if '>' in text else text
+        
+        await bot.handle_message(
+            text=text,
+            channel=event['channel'],
+            thread_ts=event.get('thread_ts', event.get('ts')),
+            sender_id=event.get('user'),
+            is_mention=True
+        )
+    except Exception as e:
+        logger.error(f"Error handling mention: {e}")
+        await say("I'm sorry, I encountered an error while processing your request.")
 
 @app.event("message")
-def handle_message(event, say):
-    """Handle direct messages and other message events."""
-    # Only handle direct messages (IM) and not mentions or other message subtypes
-    if event.get('channel_type') == 'im' and not event.get('subtype'):
-        logger.info(f"Handling DM from user {event.get('user')}")
-        bot.handle_message(event, is_mention=False)
+async def handle_message(event, say):
+    """Handle direct messages to the bot."""
+    # Validate event
+    if not event or 'text' not in event or 'channel' not in event:
+        logger.error(f"Invalid message event: {event}")
+        return
+        
+    # Ignore messages from the bot itself
+    if event.get('user') == bot.bot_id:
+        return
+        
+    # Only handle DMs (messages in the bot's DM channel)
+    if event.get('channel_type') != 'im':
+        return
+        
+    logger.info(f"Handling DM from user {event.get('user')}")
+    try:
+        await bot.handle_message(
+            text=event['text'],
+            channel=event['channel'],
+            thread_ts=event.get('thread_ts', event.get('ts')),
+            sender_id=event.get('user'),
+            is_mention=False
+        )
+    except Exception as e:
+        logger.error(f"Error handling DM: {e}")
+        await say("I'm sorry, I encountered an error while processing your request.")
 
-def main():
-    """Main function to start the bot."""
-    logger.info("Starting Jane bot...")
-    handler = SocketModeHandler(app, apis.SLACK_APP_TOKEN)
-    handler.start()
+async def main():
+    # Initialize the bot first
+    logger.info("Initializing bot...")
+    await bot.initialize()
+    logger.info("Bot initialized successfully!")
+    
+    # Then start the socket mode handler
+    handler = AsyncSocketModeHandler(app, apis.SLACK_APP_TOKEN)
+    await handler.start_async()
 
 if __name__ == "__main__":
-    main()
+    import asyncio
+    asyncio.run(main())
