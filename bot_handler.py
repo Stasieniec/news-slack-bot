@@ -794,32 +794,32 @@ class TasterayBot:
         if request_language == 'pl':
             sections = (
                 "*• Omówione Pomysły i Koncepcje:*\n"
-                "  - Lista każdego unikalnego pomysłu z krótkim wyjaśnieniem\n"
-                "  - Dla ważnych pomysłów, wskaż kto je zaproponował (np. '*Jan* zasugerował...')\n"
+                "> - Lista każdego unikalnego pomysłu z krótkim wyjaśnieniem\n"
+                "> - Dla ważnych pomysłów, wskaż kto je zaproponował (np. *Jan* zasugerował...)\n"
                 "*• Decyzje i Wnioski:*\n"
-                "  - Zanotuj podjęte decyzje i uzgodnione punkty\n"
-                "  - Uwzględnij kto podjął lub poparł kluczowe decyzje\n"
+                "> - Zanotuj podjęte decyzje i uzgodnione punkty\n"
+                "> - Uwzględnij kto podjął lub poparł kluczowe decyzje\n"
                 "*• Pytania i Punkty Dyskusji:*\n"
-                "  - Lista zadanych pytań i kluczowych punktów dyskusji\n"
-                "  - Zaznacz kto zadał ważne pytania lub wyraził obawy\n"
+                "> - Lista zadanych pytań i kluczowych punktów dyskusji\n"
+                "> - Zaznacz kto zadał ważne pytania lub wyraził obawy\n"
                 "*• Zadania do Wykonania:*\n"
-                "  - Zanotuj wspomniane zadania i follow-upy\n"
-                "  - Uwzględnij kto jest odpowiedzialny lub zasugerował dane zadanie"
+                "> - Zanotuj wspomniane zadania i follow-upy\n"
+                "> - Uwzględnij kto jest odpowiedzialny lub zasugerował dane zadanie"
             )
         else:
             sections = (
                 "*• Ideas & Concepts Discussed:*\n"
-                "  - List each distinct idea with a brief explanation\n"
-                "  - For significant ideas, include who proposed them (e.g., '*John* suggested...')\n"
+                "> - List each distinct idea with a brief explanation\n"
+                "> - For significant ideas, include who proposed them (e.g., *John* suggested...)\n"
                 "*• Decisions & Conclusions:*\n"
-                "  - Note any decisions made or points agreed upon\n"
-                "  - Include who made or supported key decisions when relevant\n"
+                "> - Note any decisions made or points agreed upon\n"
+                "> - Include who made or supported key decisions when relevant\n"
                 "*• Questions & Discussion Points:*\n"
-                "  - List questions raised and key points of discussion\n"
-                "  - Note who raised important questions or concerns\n"
+                "> - List questions raised and key points of discussion\n"
+                "> - Note who raised important questions or concerns\n"
                 "*• Action Items:*\n"
-                "  - Note any tasks or follow-ups mentioned\n"
-                "  - Include who is responsible for or suggested each action item"
+                "> - Note any tasks or follow-ups mentioned\n"
+                "> - Include who is responsible for or suggested each action item"
             )
 
         system_content = (
@@ -915,44 +915,44 @@ class TasterayBot:
             if request_language == 'pl':
                 sections = (
                     "*1. Kluczowe Decyzje i Rezultaty:*\n"
-                    "   - Lista podjętych decyzji i osiągniętych wniosków\n"
-                    "   - Uwzględnij kto podjął lub poparł kluczowe decyzje\n\n"
+                    "> - Lista podjętych decyzji i osiągniętych wniosków\n"
+                    "> - Uwzględnij kto podjął lub poparł kluczowe decyzje\n\n"
                     "*2. Główne Pomysły i Koncepcje:*\n"
-                    "   - Lista omawianych pomysłów i koncepcji\n"
-                    "   - Dla ważnych pomysłów, wskaż kto je zaproponował\n"
-                    "   - Uwzględnij nawet drobne, ale istotne pomysły\n\n"
+                    "> - Lista omawianych pomysłów i koncepcji\n"
+                    "> - Dla ważnych pomysłów, wskaż kto je zaproponował\n"
+                    "> - Uwzględnij nawet drobne, ale istotne pomysły\n\n"
                     "*3. Zadania i Następne Kroki:*\n"
-                    "   - Lista wspomnianych zadań i planów\n"
-                    "   - Uwzględnij kto jest odpowiedzialny lub zaproponował dane zadanie\n\n"
+                    "> - Lista wspomnianych zadań i planów\n"
+                    "> - Uwzględnij kto jest odpowiedzialny lub zaproponował dane zadanie\n\n"
                     "*4. Pytania i Otwarte Kwestie:*\n"
-                    "   - Lista nierozwiązanych pytań i kwestii wymagających wyjaśnienia\n"
-                    "   - Zaznacz kto zadał ważne pytania lub wyraził obawy"
+                    "> - Lista nierozwiązanych pytań i kwestii wymagających wyjaśnienia\n"
+                    "> - Zaznacz kto zadał ważne pytania lub wyraził obawy"
                 )
                 instructions = (
                     "Bądź dokładny w identyfikowaniu *WSZYSTKICH* odrębnych pomysłów, nawet tych pozornie pobocznych. "
                     "Zachowaj informację o tym, kto jest autorem ważnych pomysłów i decyzji. "
-                    "Użyj punktorów dla lepszej czytelności."
+                    "Używaj '>' na początku każdej linii dla lepszej czytelności."
                 )
             else:
                 sections = (
                     "*1. Key Decisions & Outcomes:*\n"
-                    "   - List each significant decision or conclusion reached\n"
-                    "   - Include who made or supported key decisions when relevant\n\n"
+                    "> - List each significant decision or conclusion reached\n"
+                    "> - Include who made or supported key decisions when relevant\n\n"
                     "*2. Main Ideas & Concepts:*\n"
-                    "   - List each unique idea or concept discussed\n"
-                    "   - For significant ideas, include who proposed them\n"
-                    "   - Include even minor ideas that might be relevant\n\n"
+                    "> - List each unique idea or concept discussed\n"
+                    "> - For significant ideas, include who proposed them\n"
+                    "> - Include even minor ideas that might be relevant\n\n"
                     "*3. Action Items & Next Steps:*\n"
-                    "   - List any tasks, follow-ups, or future plans mentioned\n"
-                    "   - Include who is responsible for or suggested each action item\n\n"
+                    "> - List any tasks, follow-ups, or future plans mentioned\n"
+                    "> - Include who is responsible for or suggested each action item\n\n"
                     "*4. Questions & Open Points:*\n"
-                    "   - List any unresolved questions or points needing clarification\n"
-                    "   - Note who raised important questions or concerns"
+                    "> - List any unresolved questions or points needing clarification\n"
+                    "> - Note who raised important questions or concerns"
                 )
                 instructions = (
                     "Be thorough in identifying *ALL* distinct ideas, even if they seem tangential. "
                     "Maintain attribution of significant ideas and decisions to their authors. "
-                    "Use bullet points for better readability."
+                    "Use '>' at the start of each line for better readability."
                 )
 
             # Split summaries into sections if there are too many
@@ -1039,7 +1039,14 @@ class TasterayBot:
         
         # Add the main summary
         if final_summary:
-            formatted_summary = final_summary.replace('**', '*')
+            # Convert any remaining markdown to Slack format
+            formatted_summary = final_summary
+            formatted_summary = re.sub(r'\*\*(.*?)\*\*', r'*\1*', formatted_summary)  # Bold
+            formatted_summary = re.sub(r'__(.*?)__', r'_\1_', formatted_summary)  # Italic
+            formatted_summary = re.sub(r'```(.*?)```', r'`\1`', formatted_summary)  # Code blocks
+            # Add blockquote to bullet points
+            formatted_summary = '\n'.join('> ' + line if line.strip().startswith('-') or line.strip().startswith('•') else line 
+                                for line in formatted_summary.split('\n'))
             response_parts.append(formatted_summary)
         
         # Add chronological timeline if we have multiple sections
@@ -1052,11 +1059,12 @@ class TasterayBot:
                 formatted_lines = []
                 for line in section['summary'].split('\n'):
                     if line.strip():
-                        line = line.replace('**', '*')
-                        if line.startswith('•') or line.startswith('-'):
-                            formatted_lines.append(f">{line}")
-                        else:
-                            formatted_lines.append(f">{line}")
+                        # Convert any remaining markdown to Slack format
+                        line = re.sub(r'\*\*(.*?)\*\*', r'*\1*', line)  # Bold
+                        line = re.sub(r'__(.*?)__', r'_\1_', line)  # Italic
+                        line = re.sub(r'```(.*?)```', r'`\1`', line)  # Code blocks
+                        # Add blockquote to all lines
+                        formatted_lines.append(f"> {line}")
                 response_parts.append('\n'.join(formatted_lines))
                 response_parts.append("\n─────────────────────\n")
         
