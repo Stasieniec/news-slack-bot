@@ -34,14 +34,16 @@ class TasterayBot:
         }
         self.channel_cache = {}
         # Context limits
-        self.DM_CONTEXT_LIMIT = 15  # Increased from 10 to get more context
-        self.MENTION_CONTEXT_LIMIT = 8  # Increased from 5 to get more context
+        self.DM_CONTEXT_LIMIT = 15
+        self.MENTION_CONTEXT_LIMIT = 8
         # Chunk sizes for summarization
-        self.DM_CHUNK_SIZE = 10  # Increased from 5 for better context in chunks
-        self.CHANNEL_CHUNK_SIZE = 25  # Increased from 20 for better summaries
-        # Token limits
-        self.DM_TOKEN_LIMIT = 2000  # Increased from 500 for complete responses
-        self.MENTION_TOKEN_LIMIT = 1000  # Increased from 300 for complete responses
+        self.DM_CHUNK_SIZE = 10
+        self.CHANNEL_CHUNK_SIZE = 25
+        # Token limits - significantly increased for long summaries
+        self.DM_TOKEN_LIMIT = 4000  # Increased from 2000
+        self.MENTION_TOKEN_LIMIT = 3000  # Increased from 1000
+        # Maximum chunks per timeline section
+        self.MAX_CHUNKS_PER_SECTION = 10
         
         # Initialize workspace access and Home tab
         self._initialize_workspace_access()
@@ -953,62 +955,121 @@ class TasterayBot:
                     "Use bullet points for better readability."
                 )
 
-            final_summary_prompt = [
-                {
-                    "role": "system",
-                    "content": (
-                        "You are Ray, Tasteray's intelligent assistant. Your task is to create a comprehensive summary "
-                        "that identifies and catalogs all distinct ideas, concepts, and decisions from the conversation. "
-                        f"Provide the summary in {'Polish' if request_language == 'pl' else 'English'}.\n\n"
-                        "Structure your response with these sections:\n\n"
-                        f"{sections}\n\n"
-                        f"{instructions}"
-                    )
-                },
-                {
-                    "role": "user",
-                    "content": (
-                        "Create a comprehensive summary from these conversation summaries, "
-                        "identifying ALL distinct ideas and concepts:\n\n" +
-                        "\n\n".join(s['summary'] for s in summaries)
-                    )
-                }
-            ]
+            # Split summaries into sections if there are too many
+            timeline_sections = []
+            for i in range(0, len(summaries), self.MAX_CHUNKS_PER_SECTION):
+                section_summaries = summaries[i:i + self.MAX_CHUNKS_PER_SECTION]
+                section_start = section_summaries[0]['period'].split(' to ')[0]
+                section_end = section_summaries[-1]['period'].split(' to ')[1]
+                
+                final_summary_prompt = [
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are Ray, Tasteray's intelligent assistant. Your task is to create a comprehensive summary "
+                            "that identifies and catalogs all distinct ideas, concepts, and decisions from the conversation. "
+                            f"Provide the summary in {'Polish' if request_language == 'pl' else 'English'}.\n\n"
+                            "Structure your response with these sections:\n\n"
+                            f"{sections}\n\n"
+                            f"{instructions}"
+                        )
+                    },
+                    {
+                        "role": "user",
+                        "content": (
+                            "Create a comprehensive summary from these conversation summaries, "
+                            "identifying ALL distinct ideas and concepts:\n\n" +
+                            "\n\n".join(s['summary'] for s in section_summaries)
+                        )
+                    }
+                ]
 
-            try:
-                response = client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=final_summary_prompt,
-                    max_tokens=2000 if is_dm else 1500,  # Increased from DM_TOKEN_LIMIT/MENTION_TOKEN_LIMIT
-                    temperature=0.7
-                )
-                final_summary = response.choices[0].message.content.strip()
-            except Exception as e:
-                logger.error(f"Failed to create final summary: {e}")
+                try:
+                    response = client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=final_summary_prompt,
+                        max_tokens=3000,  # Increased token limit for section summaries
+                        temperature=0.7
+                    )
+                    section_summary = response.choices[0].message.content.strip()
+                    timeline_sections.append({
+                        'period': f"{section_start} to {section_end}",
+                        'summary': section_summary
+                    })
+                except Exception as e:
+                    logger.error(f"Failed to create section summary: {e}")
+                    continue
+
+            # Create overall summary from section summaries
+            if timeline_sections:
+                try:
+                    overall_summary_prompt = [
+                        {
+                            "role": "system",
+                            "content": (
+                                "Create a high-level summary of the entire conversation period, "
+                                "focusing on the most important developments, decisions, and trends. "
+                                f"Provide the summary in {'Polish' if request_language == 'pl' else 'English'}."
+                            )
+                        },
+                        {
+                            "role": "user",
+                            "content": "\n\n".join(s['summary'] for s in timeline_sections)
+                        }
+                    ]
+                    
+                    response = client.chat.completions.create(
+                        model="gpt-4o",
+                        messages=overall_summary_prompt,
+                        max_tokens=4000,  # Maximum tokens for overall summary
+                        temperature=0.7
+                    )
+                    final_summary = response.choices[0].message.content.strip()
+                except Exception as e:
+                    logger.error(f"Failed to create final summary: {e}")
+                    final_summary = timeline_sections[0]['summary']
+            else:
                 final_summary = None
         else:
             final_summary = summaries[0]['summary'] if summaries else None
+            timeline_sections = []
 
         # Format the response using Slack's markdown
         response_parts = []
         
         # Add the main summary
         if final_summary:
-            # Ensure proper Slack formatting for bold text
-            formatted_summary = final_summary.replace('**', '*')  # Replace any markdown bold with Slack bold
+            formatted_summary = final_summary.replace('**', '*')
             response_parts.append(formatted_summary)
         
-        # Add chronological timeline if we have multiple chunks
-        if len(summaries) > 1:
+        # Add chronological timeline if we have multiple sections
+        if timeline_sections:
             timeline_header = "*Chronological Timeline*" if request_language == 'en' else "*Oś Czasowa*"
             response_parts.append(f"\n:clock1: {timeline_header}")
-            for i, summary in enumerate(summaries, 1):
+            
+            for section in timeline_sections:
+                response_parts.append(f"\n:calendar: *{section['period']}*")
+                formatted_lines = []
+                for line in section['summary'].split('\n'):
+                    if line.strip():
+                        line = line.replace('**', '*')
+                        if line.startswith('•') or line.startswith('-'):
+                            formatted_lines.append(f">{line}")
+                        else:
+                            formatted_lines.append(f">{line}")
+                response_parts.append('\n'.join(formatted_lines))
+                response_parts.append("\n─────────────────────\n")
+        
+        # If we have individual summaries and they're not too many, add them as well
+        elif len(summaries) > 1 and len(summaries) <= self.MAX_CHUNKS_PER_SECTION:
+            timeline_header = "*Detailed Timeline*" if request_language == 'en' else "*Szczegółowa Oś Czasowa*"
+            response_parts.append(f"\n:clock1: {timeline_header}")
+            
+            for summary in summaries:
                 response_parts.append(f"\n:small_blue_diamond: *{summary['period']}*")
-                # Format the summary with proper indentation and Slack formatting
                 formatted_lines = []
                 for line in summary['summary'].split('\n'):
-                    if line.strip():  # Skip empty lines
-                        # Replace any markdown bold with Slack bold
+                    if line.strip():
                         line = line.replace('**', '*')
                         if line.startswith('•') or line.startswith('-'):
                             formatted_lines.append(f">{line}")
