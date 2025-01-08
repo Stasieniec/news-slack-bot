@@ -38,7 +38,7 @@ def handle_message(event, say):
 
 def main():
     """Main function to start the bot."""
-    logger.info("Starting Ray bot...")
+    logger.info("Starting Jane bot...")
     handler = SocketModeHandler(app, apis.SLACK_APP_TOKEN)
     handler.start()
 

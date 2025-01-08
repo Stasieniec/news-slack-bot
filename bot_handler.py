@@ -428,9 +428,9 @@ class TasterayBot:
         channel_info = self._resolve_channel_reference(channel)
         if not channel_info:
             return (
-                "Could not access channel: {channel}. For private channels, please invite me first using `/invite @Ray`"
+                "Could not access channel: {channel}. For private channels, please invite me first using `/invite @Jane`"
                 if request_language == 'en' else
-                f"Nie mogę uzyskać dostępu do kanału: {channel}. W przypadku kanałów prywatnych, najpierw zaproś mnie używając `/invite @Ray`"
+                f"Nie mogę uzyskać dostępu do kanału: {channel}. W przypadku kanałów prywatnych, najpierw zaproś mnie używając `/invite @Jane`"
             )
         
         channel_id, channel_name = channel_info
@@ -492,7 +492,7 @@ class TasterayBot:
             ts = datetime.fromtimestamp(float(msg['ts'])).strftime('%Y-%m-%d %H:%M:%S')
             # Add special formatting for bot messages in the context
             if msg['is_bot']:
-                formatted_context.append(f"[{ts}] Ray (assistant): {msg['text']}")
+                formatted_context.append(f"[{ts}] Jane (assistant): {msg['text']}")
             else:
                 formatted_context.append(f"[{ts}] {msg['user']} (user): {msg['text']}")
         
@@ -507,7 +507,7 @@ class TasterayBot:
 
         # Modify the prompt based on whether it's a DM or mention
         base_prompt = (
-            f"You are Ray, an intelligent internal assistant for Tasteray - an AI-powered movie recommendation platform. "
+            f"You are Jane, an intelligent internal assistant for Tasteray - an AI-powered movie recommendation platform. "
             f"Today's date is {current_date}.\n\n"
             "Key Information:\n"
             "1. You are designed to help with various tasks including news gathering, channel summarization, and general assistance\n"
@@ -591,7 +591,7 @@ class TasterayBot:
                     "8. IMPORTANT: Always use English for function names and parameters\n\n"
                     "Example Responses:\n"
                     "1. Delete last message (Polish command -> English function):\n"
-                    "   User: '@Ray usuń ostatnią wiadomość'\n"
+                    "   User: '@Jane usuń ostatnią wiadomość'\n"
                     "   Response: {\"function\":\"delete_last\",\"parameters\":{},\"response\":null}\n\n"
                 )
             },
@@ -672,28 +672,28 @@ class TasterayBot:
     def _get_help(self):
         """Return help message with available commands."""
         return (
-            "Hi! I'm Ray, the internal Tasteray assistant. Here's what I can do:\n\n"
+            "Hi! I'm Jane, the internal Tasteray assistant. Here's what I can do:\n\n"
             "• `news`: Get news articles\n"
             "  - Default: yesterday's articles\n"
-            "  - With dates: `@Ray news from 2024-11-01 to 2024-11-05`\n"
-            "  - Today's news: `@Ray news today`\n"
-            "  - Custom keywords: `@Ray news keywords: AI, streaming, personalization`\n"
-            "  - Custom article count: `@Ray news articles: 5`\n"
-            "  - Combine options: `@Ray news today keywords: AI, streaming articles: 3`\n\n"
+            "  - With dates: `@Jane news from 2024-11-01 to 2024-11-05`\n"
+            "  - Today's news: `@Jane news today`\n"
+            "  - Custom keywords: `@Jane news keywords: AI, streaming, personalization`\n"
+            "  - Custom article count: `@Jane news articles: 5`\n"
+            "  - Combine options: `@Jane news today keywords: AI, streaming articles: 3`\n\n"
             "• `summarize`: Get channel summaries\n"
-            "  - Current channel: `@Ray summarize this channel`\n"
-            "  - With dates: `@Ray summarize this channel from 2024-11-01 to 2024-11-05`\n"
-            "  - Since date: `@Ray summarize this channel since 2024-11-01`\n"
-            "  - Until date: `@Ray summarize this channel until 2024-11-05`\n"
-            "  - Entire history: `@Ray summarize this channel history`\n\n"
+            "  - Current channel: `@Jane summarize this channel`\n"
+            "  - With dates: `@Jane summarize this channel from 2024-11-01 to 2024-11-05`\n"
+            "  - Since date: `@Jane summarize this channel since 2024-11-01`\n"
+            "  - Until date: `@Jane summarize this channel until 2024-11-05`\n"
+            "  - Entire history: `@Jane summarize this channel history`\n\n"
             "• `task`: Create ClickUp tasks\n"
-            "  - Basic: `@Ray task Create new feature`\n"
-            "  - With status: `@Ray task Create new feature status: In Progress`\n"
-            "  - With assignees: `@Ray task Create new feature assign: @john, @sarah`\n"
-            "  - With due date: `@Ray task Create new feature due: 2024-02-01`\n"
-            "  - With priority: `@Ray task Create new feature priority: high`\n"
-            "  - Full example: `@Ray task Create new feature status: In Progress assign: @john due: 2024-02-01 priority: high`\n\n"
-            "Just mention me (@Ray) with any of these commands!"
+            "  - Basic: `@Jane task Create new feature`\n"
+            "  - With status: `@Jane task Create new feature status: In Progress`\n"
+            "  - With assignees: `@Jane task Create new feature assign: @john, @sarah`\n"
+            "  - With due date: `@Jane task Create new feature due: 2024-02-01`\n"
+            "  - With priority: `@Jane task Create new feature priority: high`\n"
+            "  - Full example: `@Jane task Create new feature status: In Progress assign: @john due: 2024-02-01 priority: high`\n\n"
+            "Just mention me (@Jane) with any of these commands!"
         )
 
     def handle_message(self, event: Dict, is_mention: bool = True):
@@ -823,7 +823,7 @@ class TasterayBot:
             )
 
         system_content = (
-            "You are Ray, Tasteray's intelligent assistant. Your task is to analyze conversations "
+            "You are Jane, Tasteray's intelligent assistant. Your task is to analyze conversations "
             "and identify ALL distinct ideas, concepts, and points of discussion. "
             f"Provide the summary in {'Polish' if request_language == 'pl' else 'English'}.\n\n"
             "Guidelines for analysis:"
@@ -966,7 +966,7 @@ class TasterayBot:
                     {
                         "role": "system",
                         "content": (
-                            "You are Ray, Tasteray's intelligent assistant. Your task is to create a comprehensive summary "
+                            "You are Jane, Tasteray's intelligent assistant. Your task is to create a comprehensive summary "
                             "that identifies and catalogs all distinct ideas, concepts, and decisions from the conversation. "
                             f"Provide the summary in {'Polish' if request_language == 'pl' else 'English'}.\n\n"
                             "Structure your response with these sections:\n\n"
@@ -1039,15 +1039,7 @@ class TasterayBot:
         
         # Add the main summary
         if final_summary:
-            # Convert any remaining markdown to Slack format
-            formatted_summary = final_summary
-            formatted_summary = re.sub(r'\*\*(.*?)\*\*', r'*\1*', formatted_summary)  # Bold
-            formatted_summary = re.sub(r'__(.*?)__', r'_\1_', formatted_summary)  # Italic
-            formatted_summary = re.sub(r'```(.*?)```', r'`\1`', formatted_summary)  # Code blocks
-            # Add blockquote to bullet points
-            formatted_summary = '\n'.join('> ' + line if line.strip().startswith('-') or line.strip().startswith('•') else line 
-                                for line in formatted_summary.split('\n'))
-            response_parts.append(formatted_summary)
+            response_parts.append(self._format_summary_section(final_summary))
         
         # Add chronological timeline if we have multiple sections
         if timeline_sections:
@@ -1056,16 +1048,8 @@ class TasterayBot:
             
             for section in timeline_sections:
                 response_parts.append(f"\n:calendar: *{section['period']}*")
-                formatted_lines = []
-                for line in section['summary'].split('\n'):
-                    if line.strip():
-                        # Convert any remaining markdown to Slack format
-                        line = re.sub(r'\*\*(.*?)\*\*', r'*\1*', line)  # Bold
-                        line = re.sub(r'__(.*?)__', r'_\1_', line)  # Italic
-                        line = re.sub(r'```(.*?)```', r'`\1`', line)  # Code blocks
-                        # Add blockquote to all lines
-                        formatted_lines.append(f"> {line}")
-                response_parts.append('\n'.join(formatted_lines))
+                formatted_section = self._format_summary_section(section['summary'])
+                response_parts.append(formatted_section)
                 response_parts.append("\n─────────────────────\n")
         
         # If we have individual summaries and they're not too many, add them as well
@@ -1075,15 +1059,8 @@ class TasterayBot:
             
             for summary in summaries:
                 response_parts.append(f"\n:small_blue_diamond: *{summary['period']}*")
-                formatted_lines = []
-                for line in summary['summary'].split('\n'):
-                    if line.strip():
-                        line = line.replace('**', '*')
-                        if line.startswith('•') or line.startswith('-'):
-                            formatted_lines.append(f">{line}")
-                        else:
-                            formatted_lines.append(f">{line}")
-                response_parts.append('\n'.join(formatted_lines))
+                formatted_section = self._format_summary_section(summary['summary'])
+                response_parts.append(formatted_section)
         
         return '\n'.join(response_parts)
 
@@ -1096,7 +1073,7 @@ class TasterayBot:
                     "type": "header",
                     "text": {
                         "type": "plain_text",
-                        "text": "👋 Welcome to Ray!",
+                        "text": "👋 Welcome to Jane!",
                         "emoji": True
                     }
                 },
@@ -1145,7 +1122,7 @@ class TasterayBot:
                     "type": "section",
                     "text": {
                         "type": "mrkdwn",
-                        "text": "• `@Ray news` - Get latest news\n• `@Ray summarize this channel` - Summarize current channel\n• `@Ray help` - Show all commands"
+                        "text": "• `@Jane news` - Get latest news\n• `@Jane summarize this channel` - Summarize current channel\n• `@Jane help` - Show all commands"
                     }
                 },
                 {
@@ -1156,7 +1133,7 @@ class TasterayBot:
                     "elements": [
                         {
                             "type": "mrkdwn",
-                            "text": "🤖 Ray is always learning and improving. Your feedback helps make me better!"
+                            "text": "🤖 Jane is always learning and improving. Your feedback helps make me better!"
                         }
                     ]
                 }
@@ -1289,7 +1266,7 @@ class TasterayBot:
             
             # Check if it's our bot
             if user_id == self.client.auth_test()['user_id']:
-                return 'Ray'
+                return 'Jane'
                 
             user_info = self.client.users_info(user=user_id)
             # Prefer display name, fall back to real name, then username
@@ -1346,3 +1323,40 @@ class TasterayBot:
             new_text = new_text.replace(user_id, f'*{user_name}*')
         
         return new_text
+
+    def _format_slack_line(self, line: str) -> str:
+        """Format a line of text with proper Slack markdown."""
+        line = line.strip()
+        if not line:
+            return line
+            
+        # Convert markdown to Slack format
+        line = re.sub(r'\*\*(.*?)\*\*', r'*\1*', line)  # Bold
+        line = re.sub(r'__(.*?)__', r'_\1_', line)  # Italic
+        line = re.sub(r'```(.*?)```', r'`\1`', line)  # Code blocks
+        
+        # Handle bullet points and blockquotes
+        if line.startswith('•') or line.startswith('-') or line.startswith('*'):
+            # Remove the bullet point character and any extra spaces
+            line = re.sub(r'^[•\-\*]\s*', '• ', line)
+            return f">{line}"
+        elif line.startswith('>'):
+            # Ensure proper spacing after blockquote
+            return f">{line[1:].strip()}"
+        else:
+            return line
+
+    def _format_summary_section(self, text: str) -> str:
+        """Format a summary section with proper Slack markdown."""
+        if not text:
+            return text
+            
+        lines = text.split('\n')
+        formatted_lines = []
+        
+        for line in lines:
+            formatted_line = self._format_slack_line(line)
+            if formatted_line:
+                formatted_lines.append(formatted_line)
+        
+        return '\n'.join(formatted_lines)
