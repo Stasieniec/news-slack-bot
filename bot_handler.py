@@ -208,12 +208,12 @@ class TasterayBot:
         except Exception as e:
             logger.error(f"Error initializing ClickUp users: {e}")
 
-    def _ensure_channel_access(self, channel_id: str) -> bool:
+    async def _ensure_channel_access(self, channel_id: str) -> bool:
         """Ensure the bot has access to the specified channel."""
         try:
             # First check if we can get channel info - this verifies access
             try:
-                channel_info = self.client.conversations_info(channel=channel_id)
+                channel_info = await self.client.conversations_info(channel=channel_id)
                 # If we can get info, we have access
                 logger.info(f"Already have access to channel {channel_id}")
                 return True
@@ -224,7 +224,7 @@ class TasterayBot:
             
             # If we get here, try joining the channel
             try:
-                self.client.conversations_join(
+                await self.client.conversations_join(
                     channel=channel_id,
                     no_notify=True  # Join silently without notifying channel members
                 )
@@ -245,7 +245,7 @@ class TasterayBot:
             logger.error(f"Error ensuring channel access: {e}")
             return False
 
-    def _resolve_channel_reference(self, channel_ref: str) -> Optional[Tuple[str, str]]:
+    async def _resolve_channel_reference(self, channel_ref: str) -> Optional[Tuple[str, str]]:
         """
         Resolve a channel reference to a channel ID and name.
         Returns tuple of (channel_id, channel_name) or None if not found.
@@ -257,7 +257,7 @@ class TasterayBot:
             if channel_ref.startswith('C'):
                 # Get channel info to verify it exists and get the name
                 try:
-                    response = self.client.conversations_info(channel=channel_ref)
+                    response = await self.client.conversations_info(channel=channel_ref)
                     channel_name = response['channel']['name']
                     logger.info(f"Resolved channel ID {channel_ref} to #{channel_name}")
                     return channel_ref, channel_name
@@ -273,7 +273,7 @@ class TasterayBot:
                 channel_id = self.channel_cache[channel_name]
                 # Verify we can access the channel
                 try:
-                    self.client.conversations_info(channel=channel_id)
+                    await self.client.conversations_info(channel=channel_id)
                     logger.info(f"Found channel #{channel_name} in cache with ID {channel_id}")
                     return channel_id, channel_name
                 except SlackApiError:
@@ -282,7 +282,7 @@ class TasterayBot:
                     del self.channel_cache[channel_name]
             
             # List all channels the bot has access to
-            response = self.client.conversations_list(
+            response = await self.client.conversations_list(
                 types="public_channel,private_channel",
                 exclude_archived=True,
                 limit=1000
@@ -296,7 +296,7 @@ class TasterayBot:
                     channel_id = channel['id']
                     # Double check we can access this channel
                     try:
-                        self.client.conversations_info(channel=channel_id)
+                        await self.client.conversations_info(channel=channel_id)
                         logger.info(f"Resolved channel #{channel_name} to ID {channel_id}")
                         return channel_id, channel_name
                     except SlackApiError as e:
@@ -310,7 +310,7 @@ class TasterayBot:
             logger.error(f"Failed to list channels: {e}")
             return None
 
-    def _get_context(self, channel: str, thread_ts: str = None, is_mention: bool = True, event: Dict = None) -> List[Dict]:
+    async def _get_context(self, channel: str, thread_ts: str = None, is_mention: bool = True, event: Dict = None) -> List[Dict]:
         """
         Retrieve conversation context.
         For mentions: last MENTION_CONTEXT_LIMIT messages
@@ -334,114 +334,64 @@ class TasterayBot:
                    (f" thread {thread_ts}" if thread_ts else "") +
                    f" with limit {limit}")
         try:
-            # For DMs, always get the conversation history
-            if not is_mention:
-                print("\nGetting DM history...")
-                current_ts = datetime.now().timestamp()
+            # For DMs or thread replies, get the conversation history
+            if not is_mention or thread_ts:
+                print("\nGetting conversation history...")
                 
-                # Get messages before the current timestamp
-                response = self.client.conversations_history(
-                    channel=channel,
-                    limit=limit + 1,  # Get one extra message to include current
-                    inclusive=True,
-                    include_all_metadata=True
-                )
-                
-                # If we didn't get enough messages and there are more
-                if len(response.get('messages', [])) < limit and response.get('has_more', False):
-                    print(f"\nFound only {len(response.get('messages', []))} messages, fetching more from history...")
-                    cursor = response['response_metadata'].get('next_cursor')
-                    while cursor and len(response.get('messages', [])) < limit:
-                        historical_response = self.client.conversations_history(
-                            channel=channel,
-                            cursor=cursor,
-                            limit=limit - len(response.get('messages', [])),
-                            inclusive=True
-                        )
-                        # Combine messages, avoiding duplicates
-                        all_messages = response.get('messages', [])
-                        seen_ts = {msg['ts'] for msg in all_messages}
-                        for msg in historical_response.get('messages', []):
-                            if msg['ts'] not in seen_ts:
-                                all_messages.append(msg)
-                        response['messages'] = all_messages
-                        
-                        if not historical_response.get('has_more'):
-                            break
-                        cursor = historical_response['response_metadata'].get('next_cursor')
-                    
-                    print(f"Total messages after fetching more: {len(response.get('messages', []))}")
-            
-            # For channel mentions with thread
-            elif thread_ts:
-                print("\nGetting thread replies...")
-                response = self.client.conversations_replies(
-                    channel=channel,
-                    ts=thread_ts,
-                    limit=limit,
-                    inclusive=True
-                )
+                # Use conversations_replies for threads
+                if thread_ts:
+                    response = await self.client.conversations_replies(
+                        channel=channel,
+                        ts=thread_ts,
+                        limit=limit,
+                        inclusive=True
+                    )
+                else:
+                    # For DMs, get history
+                    response = await self.client.conversations_history(
+                        channel=channel,
+                        limit=limit,
+                        inclusive=True
+                    )
             
             # For channel mentions without thread
             else:
                 print("\nGetting channel history...")
                 # Get messages before the current message
-                response = self.client.conversations_history(
+                response = await self.client.conversations_history(
                     channel=channel,
-                    limit=limit + 1,  # Get one extra for current message
-                    latest=event.get('ts'),  # Get messages before current message
-                    inclusive=True,
-                    include_all_metadata=True
+                    limit=limit,
+                    latest=event.get('ts') if event else None,
+                    inclusive=True
                 )
-                
-                # If we didn't get enough messages and there are more
-                if len(response.get('messages', [])) < limit and response.get('has_more', False):
-                    print(f"\nFound only {len(response.get('messages', []))} messages, fetching more from history...")
-                    cursor = response['response_metadata'].get('next_cursor')
-                    while cursor and len(response.get('messages', [])) < limit:
-                        historical_response = self.client.conversations_history(
-                            channel=channel,
-                            cursor=cursor,
-                            limit=limit - len(response.get('messages', [])),
-                            inclusive=True
-                        )
-                        # Combine messages, avoiding duplicates
-                        all_messages = response.get('messages', [])
-                        seen_ts = {msg['ts'] for msg in all_messages}
-                        for msg in historical_response.get('messages', []):
-                            if msg['ts'] not in seen_ts:
-                                all_messages.append(msg)
-                        response['messages'] = all_messages
-                        
-                        if not historical_response.get('has_more'):
-                            break
-                        cursor = historical_response['response_metadata'].get('next_cursor')
-                    
-                    print(f"Total messages after fetching more: {len(response.get('messages', []))}")
             
             messages = []
-            # Process messages in reverse order (oldest first)
-            msg_list = response.get('messages', [])[:limit + 1]  # Include current message
+            # Process messages in chronological order
+            msg_list = response.get('messages', [])
             
             # Sort messages by timestamp to ensure correct order
             msg_list.sort(key=lambda x: float(x.get('ts', 0)))
             
             print("\nProcessing messages:")
             for msg in msg_list:
-                # Skip bot's own messages in channel mentions to focus on user messages
-                if msg.get('bot_id') and is_mention:
+                # Skip empty messages or messages without text
+                if not msg.get('text'):
+                    continue
+                    
+                # Skip bot messages in channel mentions (but keep them in DMs and threads)
+                if msg.get('bot_id') and is_mention and not thread_ts:
                     logger.debug("Skipping bot message in channel mention")
                     continue
                 
                 # Get user info for better context
                 user_id = msg.get('user', 'unknown')
                 is_bot = bool(msg.get('bot_id'))
-                user_name = self._get_user_name(user_id)
+                user_name = await self._get_user_name(user_id)
                 
                 # Convert user mentions in the message text
-                text = self._convert_user_mentions(msg.get('text', ''))
+                text = await self._convert_user_mentions(msg.get('text', ''))
                 
-                # Include all messages for proper context
+                # Include message in context
                 message_data = {
                     'user': user_name,
                     'text': text,
@@ -458,8 +408,8 @@ class TasterayBot:
             logger.debug(f"Retrieved {len(messages)} context messages")
             logger.debug(f"Context messages: {json.dumps(messages, indent=2)}")
             
-            # Return all messages except the current one
-            return messages[:-1] if len(messages) > 1 else []
+            # Return all messages in chronological order
+            return messages
             
         except SlackApiError as e:
             logger.error(f"Error getting context: {e}")
@@ -467,7 +417,7 @@ class TasterayBot:
             print("="*50 + "\n")
             return []
 
-    def _get_channel_history(self, channel: str, oldest: str = None, latest: str = None) -> List[Dict]:
+    async def _get_channel_history(self, channel: str, oldest: str = None, latest: str = None) -> List[Dict]:
         """Retrieve channel history with pagination support."""
         all_messages = []
         cursor = None
@@ -491,16 +441,17 @@ class TasterayBot:
                     params['cursor'] = cursor
                 
                 logger.debug(f"Fetching page {page} with params: {params}")
-                response = self.client.conversations_history(**params)
+                response = await self.client.conversations_history(**params)
                 messages = response['messages']
                 
                 # Process messages to include user names
                 for msg in messages:
                     user_id = msg.get('user', 'unknown')
-                    msg['user_name'] = self._get_user_name(user_id)
+                    user_name = await self._get_user_name(user_id)
+                    msg['user_name'] = user_name
                     # Convert user mentions in the message text and ensure user_name is used
-                    msg['text'] = self._convert_user_mentions(msg.get('text', ''))
-                    msg['user'] = msg['user_name']  # Replace user ID with name
+                    msg['text'] = await self._convert_user_mentions(msg.get('text', ''))
+                    msg['user'] = user_name  # Replace user ID with name
                 
                 all_messages.extend(messages)
                 
@@ -519,23 +470,29 @@ class TasterayBot:
         logger.info(f"Total messages retrieved: {len(all_messages)}")
         return all_messages
 
-    async def _analyze_command(self, text: str, sender_id: str = None) -> dict:
-        """Use LLM to analyze the command and determine the response."""
+    async def _analyze_message(self, text: str, context: List[Dict]) -> dict:
+        """Use LLM to analyze the message and determine the response."""
         current_date = datetime.now().strftime('%Y-%m-%d')
         
-        # Get sender's info for self-references
-        sender_name = None
-        sender_email = None
-        if sender_id:
-            try:
-                response = await self.client.users_info(user=sender_id)
-                user_info = response['user']
-                sender_name = user_info.get('real_name', '')
-                sender_email = user_info.get('profile', {}).get('email', '')
-                logger.info(f"Got sender info: name={sender_name}, email={sender_email}")
-            except SlackApiError as e:
-                logger.error(f"Error getting sender info: {e}")
+        # Format context messages for better readability
+        formatted_context = []
+        for msg in context:
+            ts = datetime.fromtimestamp(float(msg['ts'])).strftime('%Y-%m-%d %H:%M:%S')
+            # Add special formatting for bot messages in the context
+            if msg['is_bot']:
+                formatted_context.append(f"[{ts}] Jane (assistant): {msg['text']}")
+            else:
+                formatted_context.append(f"[{ts}] {msg['user']} (user): {msg['text']}")
         
+        print("\n" + "="*50)
+        print("CONTEXT BEING SENT TO OPENAI:")
+        print("="*50)
+        print("\nFormatted conversation context:")
+        for msg in formatted_context:
+            print(msg)
+        print("\nCurrent message:", text)
+        print("="*50 + "\n")
+
         messages = [
             {
                 "role": "system",
@@ -594,14 +551,15 @@ class TasterayBot:
                     "8. IMPORTANT: Always use English for function names and parameters\n"
                     "9. For tasks, try to infer assignees from context when not explicitly specified\n"
                     "10. Be forgiving with typos and informal references\n\n"
-                    f"Current User Info:\n"
-                    f"- Name: {sender_name}\n"
-                    f"- Email: {sender_email}\n"
                 )
             },
             {
                 "role": "user",
-                "content": text
+                "content": (
+                    "Previous conversation context (chronological order):\n" +
+                    "\n".join(formatted_context) +
+                    "\n\nCurrent message:\n" + text
+                )
             }
         ]
 
@@ -704,7 +662,7 @@ class TasterayBot:
         channel_info = await self._resolve_channel_reference(channel)
         if not channel_info:
             return (
-                "Could not access channel: {channel}. For private channels, please invite me first using `/invite @Jane`"
+                f"Could not access channel: {channel}. For private channels, please invite me first using `/invite @Jane`"
                 if request_language == 'en' else
                 f"Nie mogę uzyskać dostępu do kanału: {channel}. W przypadku kanałów prywatnych, najpierw zaproś mnie używając `/invite @Jane`"
             )
@@ -770,13 +728,36 @@ class TasterayBot:
             is_mention: Whether the message was a direct mention of the bot
         """
         try:
-            # Validate input
-            if not text or not channel:
-                logger.error(f"Invalid message: text='{text}', channel='{channel}'")
+            # Skip message_changed events and empty messages
+            if not text or not channel or 'message_changed' in str(text):
                 return
                 
+            logger.info(f"Processing message from {sender_id}: {text}")
+            
+            # Get context and log it for debugging
+            context = await self._get_context(channel, thread_ts, is_mention)
+            
+            # Log context messages in a condensed format
+            if context:
+                logger.info("Context messages (most recent conversation):")
+                logger.info("-" * 50)
+                for msg in context:
+                    dt = datetime.fromtimestamp(float(msg.get('ts', 0)))
+                    prefix = "→" if msg.get('is_bot', False) else "←"
+                    logger.info(f"{prefix} [{dt.strftime('%H:%M:%S')}] {msg['user']}: {msg['text']}")
+                logger.info("-" * 50)
+            
+            # Add current message to context
+            current_message = {
+                'user': await self._get_user_name(sender_id),
+                'text': await self._convert_user_mentions(text),
+                'ts': datetime.now().timestamp(),
+                'is_bot': False
+            }
+            context.append(current_message)
+                
             # Get command analysis from LLM
-            analysis = await self._analyze_command(text, sender_id)
+            analysis = await self._analyze_message(text, context)
             logger.info(f"Command analysis: {analysis}")
             
             if not analysis:
@@ -854,21 +835,22 @@ class TasterayBot:
                 # Delete last message
                 await self._delete_last_message(channel, thread_ts)
                 
-            elif function == 'direct_response':
-                # Just post the response
-                if response:
+            elif function == 'direct_response' and response:
                     await self._post_message(channel, response, thread_ts)
             
         except Exception as e:
-            error_message = f"Error: {str(e)}"
-            logger.error(f"Error handling message: {e}")
-            await self._post_message(channel, error_message, thread_ts)
+            logger.error(f"Error handling message: {e}", exc_info=True)
+            await self._post_message(
+                channel,
+                "I encountered an error processing your message. Please try again or contact support if the issue persists.",
+                thread_ts
+            )
 
     def _chunk_messages(self, messages: List[Dict], chunk_size: int = 20) -> List[List[Dict]]:
         """Split messages into manageable chunks for the LLM."""
         return [messages[i:i + chunk_size] for i in range(0, len(messages), chunk_size)]
 
-    def _summarize_chunk(self, messages: List[Dict], is_dm: bool = False, request_language: str = 'en') -> str:
+    async def _summarize_chunk(self, messages: List[Dict], is_dm: bool = False, request_language: str = 'en') -> str:
         """
         Summarize a chunk of messages using LLM.
         
@@ -881,7 +863,7 @@ class TasterayBot:
         for msg in messages:
             user = msg.get('user_name', msg.get('user', 'unknown'))
             # Convert any user mentions in the text
-            text = self._convert_user_mentions(msg.get('text', ''))
+            text = await self._convert_user_mentions(msg.get('text', ''))
             ts = datetime.fromtimestamp(float(msg.get('ts', 0))).strftime('%Y-%m-%d %H:%M:%S')
             formatted_messages.append(f"[{ts}] {user}: {text}")
 
@@ -960,7 +942,7 @@ class TasterayBot:
             logger.error(f"Failed to summarize chunk: {e}")
             return ""
 
-    def _summarize_channel(self, channel: str, oldest: str = None, latest: str = None, request_language: str = 'en') -> str:
+    async def _summarize_channel(self, channel: str, oldest: str = None, latest: str = None, request_language: str = 'en') -> str:
         """
         Summarize channel history with specified time range.
         
@@ -972,7 +954,7 @@ class TasterayBot:
         """
         # Determine if this is a DM channel
         try:
-            channel_info = self.client.conversations_info(channel=channel)
+            channel_info = await self.client.conversations_info(channel=channel)
             is_dm = channel_info['channel']['is_im']
         except SlackApiError:
             is_dm = False
@@ -980,7 +962,7 @@ class TasterayBot:
         logger.info(f"Summarizing {'DM' if is_dm else 'channel'} history in {request_language}")
         
         # Get channel history
-        messages = self._get_channel_history(channel, oldest, latest)
+        messages = await self._get_channel_history(channel, oldest, latest)
         if not messages:
             return "No messages found in the specified time range." if request_language == 'en' else "Nie znaleziono wiadomości w podanym zakresie czasowym."
 
@@ -994,7 +976,7 @@ class TasterayBot:
 
         # Process each chunk
         for i, chunk in enumerate(chunks, 1):
-            summary = self._summarize_chunk(chunk, is_dm=is_dm, request_language=request_language)
+            summary = await self._summarize_chunk(chunk, is_dm=is_dm, request_language=request_language)
             if summary:
                 # Format each chunk summary with a timestamp range
                 start_ts = datetime.fromtimestamp(float(chunk[0]['ts'])).strftime('%Y-%m-%d %H:%M')
@@ -1134,7 +1116,8 @@ class TasterayBot:
         
         # Add the main summary
         if final_summary:
-            response_parts.append(self._format_summary_section(final_summary))
+            formatted_summary = await self._format_summary_section(final_summary)
+            response_parts.append(formatted_summary)
         
         # Add chronological timeline if we have multiple sections
         if timeline_sections:
@@ -1143,7 +1126,7 @@ class TasterayBot:
             
             for section in timeline_sections:
                 response_parts.append(f"\n:calendar: *{section['period']}*")
-                formatted_section = self._format_summary_section(section['summary'])
+                formatted_section = await self._format_summary_section(section['summary'])
                 response_parts.append(formatted_section)
                 response_parts.append("\n─────────────────────\n")
         
@@ -1154,7 +1137,7 @@ class TasterayBot:
             
             for summary in summaries:
                 response_parts.append(f"\n:small_blue_diamond: *{summary['period']}*")
-                formatted_section = self._format_summary_section(summary['summary'])
+                formatted_section = await self._format_summary_section(summary['summary'])
                 response_parts.append(formatted_section)
         
         return '\n'.join(response_parts)
@@ -1864,18 +1847,19 @@ class TasterayBot:
         except Exception as e:
             raise Exception(f"Error creating task: {str(e)}")
 
-    def _get_user_name(self, user_id: str) -> str:
+    async def _get_user_name(self, user_id: str) -> str:
         """Get user's display name from their ID."""
         if not user_id or user_id == 'unknown':
             return 'Unknown User'
         
         try:
             # Check if it's our bot
-            if user_id == self.client.auth_test()['user_id']:
+            auth_test = await self.client.auth_test()
+            if user_id == auth_test['user_id']:
                 return 'Jane'
                 
             # Get user info from Slack
-            user_info = self.client.users_info(user=user_id)
+            user_info = await self.client.users_info(user=user_id)
             
             # Return the display name or real name or username, in that order of preference
             display_name = user_info['user'].get('profile', {}).get('display_name')
@@ -1887,6 +1871,25 @@ class TasterayBot:
         except SlackApiError as e:
             logger.error(f"Error getting user info: {e}")
             return f"User_{user_id}"
+
+    async def _convert_user_mentions(self, text: str) -> str:
+        """Convert user IDs in message text to display names."""
+        if not text:
+            return text
+            
+        # Match both direct mentions <@U1234567> and user references in text U1234567
+        user_mentions = set(re.finditer(r'<@(U[A-Z0-9]+)>', text))
+        user_mentions.update(re.finditer(r'\b(U[A-Z0-9]{8,})\b', text))
+        new_text = text
+        
+        for match in user_mentions:
+            user_id = match.group(1)
+            user_name = await self._get_user_name(user_id)
+            # Replace both formats with the display name
+            new_text = new_text.replace(f'<@{user_id}>', f'*{user_name}*')
+            new_text = new_text.replace(user_id, f'*{user_name}*')
+        
+        return new_text
 
     def _delete_last_message(self, channel: str = None, thread_ts: str = None) -> None:
         """Delete the last message sent by the bot in the specified channel/thread."""
@@ -1913,26 +1916,7 @@ class TasterayBot:
             logger.error(f"Error deleting last message: {e}")
             raise
 
-    def _convert_user_mentions(self, text: str) -> str:
-        """Convert user IDs in message text to display names."""
-        if not text:
-            return text
-            
-        # Match both direct mentions <@U1234567> and user references in text U1234567
-        user_mentions = set(re.finditer(r'<@(U[A-Z0-9]+)>', text))
-        user_mentions.update(re.finditer(r'\b(U[A-Z0-9]{8,})\b', text))
-        new_text = text
-        
-        for match in user_mentions:
-            user_id = match.group(1)
-            user_name = self._get_user_name(user_id)
-            # Replace both formats with the display name
-            new_text = new_text.replace(f'<@{user_id}>', f'*{user_name}*')
-            new_text = new_text.replace(user_id, f'*{user_name}*')
-        
-        return new_text
-
-    def _format_slack_line(self, line: str) -> str:
+    async def _format_slack_line(self, line: str) -> str:
         """Format a line of text with proper Slack markdown."""
         line = line.strip()
         if not line:
@@ -1954,7 +1938,7 @@ class TasterayBot:
         else:
             return line
 
-    def _format_summary_section(self, text: str) -> str:
+    async def _format_summary_section(self, text: str) -> str:
         """Format a summary section with proper Slack markdown."""
         if not text:
             return text
@@ -1963,7 +1947,7 @@ class TasterayBot:
         formatted_lines = []
         
         for line in lines:
-            formatted_line = self._format_slack_line(line)
+            formatted_line = await self._format_slack_line(line)
             if formatted_line:
                 formatted_lines.append(formatted_line)
         
@@ -1979,6 +1963,9 @@ class TasterayBot:
             thread_ts: The thread timestamp if posting in a thread
         """
         try:
+            # Convert any user mentions in the text before sending
+            text = await self._convert_user_mentions(text)
+            
             # Send response with unfurl_links=False to prevent link previews
             response = await self.client.chat_postMessage(
                 channel=channel,
