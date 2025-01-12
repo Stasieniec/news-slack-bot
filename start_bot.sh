@@ -1,33 +1,34 @@
 #!/bin/bash
 
 # Directory where your bot code lives
-BOT_DIR="/home/wasil/Desktop/news-slack-bot"
-SESSION_NAME="newsbot"
+BOT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+LOG_DIR="$BOT_DIR/logs"
+
+# Create logs directory if it doesn't exist
+mkdir -p $LOG_DIR
 
 # Ensure we're in the right directory
 cd $BOT_DIR
 
-# Function to check if tmux session exists
-tmux_session_exists() {
-    tmux has-session -t $SESSION_NAME 2>/dev/null
-}
+# Kill any existing instances
+pkill -f "python scheduler.py"
+pkill -f "python app.py"
 
-# Kill existing session if it exists
-if tmux_session_exists; then
-    tmux kill-session -t $SESSION_NAME
-fi
+# Activate virtual environment
+source tasteray_env/bin/activate
 
-# Create new session
-tmux new-session -d -s $SESSION_NAME
+echo "Starting bot processes..."
+echo "----------------------------------------"
 
-# Navigate to bot directory and activate virtual environment
-tmux send-keys -t $SESSION_NAME "cd $BOT_DIR && source tasteray_env/bin/activate && python scheduler.py" C-m
+# Start both processes and combine their output
+(python scheduler.py | tee "$LOG_DIR/scheduler.log") & \
+(python app.py | tee "$LOG_DIR/app.log") &
 
-# Split window horizontally
-tmux split-window -h -t $SESSION_NAME
+# Store PIDs for potential later use
+echo $! > "$LOG_DIR/app.pid"
 
-# Navigate to bot directory and activate virtual environment in second pane
-tmux send-keys -t $SESSION_NAME.1 "cd $BOT_DIR && source tasteray_env/bin/activate && python app.py" C-m
+echo "Bot processes started. Showing live logs below:"
+echo "----------------------------------------"
 
-echo "Bot started in tmux session '$SESSION_NAME'"
-echo "To view the session, use: tmux attach -t $SESSION_NAME"
+# Use tail to follow both log files in real-time
+tail -f "$LOG_DIR/scheduler.log" "$LOG_DIR/app.log"

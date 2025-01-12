@@ -16,7 +16,7 @@ A Slack bot that collects and shares news articles about streaming services and 
 ```bash
 # Install required system packages
 sudo apt update
-sudo apt install -y python3-venv tmux git
+sudo apt install -y python3-venv git
 ```
 
 ### Installation
@@ -59,39 +59,35 @@ python test_mention.py
 
 #### Production (Raspberry Pi)
 
-1. Start the service:
+1. Make the start script executable:
 ```bash
-sudo systemctl start newsbot
+chmod +x start_bot.sh
 ```
 
-2. Check status:
+2. Start the bot:
 ```bash
-sudo systemctl status newsbot
+./start_bot.sh
 ```
 
-3. View logs:
+The bot will start and show logs directly in your terminal. To stop showing logs but keep the bot running, press Ctrl+C. The bot processes will continue in the background.
+
+3. To view logs again later:
 ```bash
-tmux attach -t newsbot
-# (Use Ctrl+B then D to detach)
+tail -f logs/scheduler.log logs/app.log
 ```
 
 ### Common Commands
 
 ```bash
-# Start the bot
-sudo systemctl start newsbot
+# Start the bot and view logs
+./start_bot.sh
 
-# Stop the bot
-sudo systemctl stop newsbot
+# View logs if bot is already running
+tail -f logs/scheduler.log logs/app.log
 
-# Restart the bot
-sudo systemctl restart newsbot
-
-# View service status
-sudo systemctl status newsbot
-
-# View logs
-tmux attach -t newsbot
+# Stop the bot completely
+pkill -f "python scheduler.py"
+pkill -f "python app.py"
 
 # Update the bot (after code changes)
 ./update_bot.sh
@@ -146,14 +142,16 @@ The bot responds to these commands:
 
 1. Bot not responding:
 ```bash
-# Check service status
-sudo systemctl status newsbot
+# Check if processes are running
+ps aux | grep python
 
 # View logs
-tmux attach -t newsbot
+tail -f logs/scheduler.log logs/app.log
 
-# Restart the service
-sudo systemctl restart newsbot
+# Restart the bot
+pkill -f "python scheduler.py"
+pkill -f "python app.py"
+./start_bot.sh
 ```
 
 2. API errors:
