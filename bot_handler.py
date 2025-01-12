@@ -540,6 +540,11 @@ class TasterayBot:
                     "3. Ask for clarification if a request is ambiguous\n"
                     "4. Be forgiving with typos and informal language\n"
                     "5. Format responses for readability in Slack\n\n"
+                    "Date Range Understanding:\n"
+                    "- When user mentions 'entire channel' or similar phrases, return empty from_date and to_date\n"
+                    "- When user mentions 'last month' or similar, calculate appropriate from_date and to_date\n"
+                    "- When user provides specific dates, parse them into YYYY-MM-DD format\n"
+                    "- Handle both English and Polish date references naturally\n\n"
                     "Response Format:\n"
                     "Return a JSON with these fields (always use English field names):\n"
                     "{\n"
@@ -711,6 +716,9 @@ class TasterayBot:
             if to_date:
                 date_range.append(f"{'do' if request_language == 'pl' else 'to'} {to_date}")
             header_parts.append(f"_({' '.join(date_range)})_")
+        else:
+            # Add indication if it's entire history
+            header_parts.append("_(entire channel history)_" if request_language == 'en' else "_(cała historia kanału)_")
         
         # Add summary note if specified
         if summary_note:
