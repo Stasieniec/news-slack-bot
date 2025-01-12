@@ -15,7 +15,7 @@ pkill -f "python scheduler.py"
 pkill -f "python app.py"
 
 # Activate virtual environment
-source tasteray_env/bin/activate
+source venv/bin/activate
 
 echo "Starting bot processes..."
 echo "----------------------------------------"
