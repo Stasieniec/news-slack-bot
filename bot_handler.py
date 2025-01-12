@@ -278,7 +278,7 @@ class TasterayBot:
                     return None
             
             # If it's a channel name (with or without #)
-            channel_name = channel_ref.lstrip('#')
+            channel_name = channel_ref.lstrip('#').lower()  # Make case-insensitive
             
             # Check cache first
             if channel_name in self.channel_cache:
@@ -302,9 +302,9 @@ class TasterayBot:
             
             for channel in response['channels']:
                 # Cache all channels for future use
-                self.channel_cache[channel['name']] = channel['id']
+                self.channel_cache[channel['name'].lower()] = channel['id']
                 
-                if channel['name'] == channel_name:
+                if channel['name'].lower() == channel_name:
                     channel_id = channel['id']
                     # Double check we can access this channel
                     try:
