@@ -253,6 +253,18 @@ class TasterayBot:
         logger.info(f"Resolving channel reference: {channel_ref}")
         
         try:
+            # Handle Slack channel mention format <#C1234|channel_name>
+            if channel_ref.startswith('<#') and '|' in channel_ref:
+                channel_id = channel_ref[2:].split('|')[0]  # Extract ID between <# and |
+                try:
+                    response = await self.client.conversations_info(channel=channel_id)
+                    channel_name = response['channel']['name']
+                    logger.info(f"Resolved channel mention {channel_ref} to #{channel_name}")
+                    return channel_id, channel_name
+                except SlackApiError as e:
+                    logger.error(f"Failed to get info for channel mention {channel_ref}: {e}")
+                    return None
+
             # If it's already a channel ID format
             if channel_ref.startswith('C'):
                 # Get channel info to verify it exists and get the name
@@ -446,16 +458,29 @@ class TasterayBot:
                 
                 # Process messages to include user names
                 for msg in messages:
-                    user_id = msg.get('user', 'unknown')
-                    user_name = await self._get_user_name(user_id)
-                    msg['user_name'] = user_name
-                    # Convert user mentions in the message text and ensure user_name is used
-                    msg['text'] = await self._convert_user_mentions(msg.get('text', ''))
-                    msg['user'] = user_name  # Replace user ID with name
+                    # Skip deleted messages and other special message types
+                    if msg.get('subtype') in ['message_deleted', 'message_changed', 'channel_join', 'channel_leave']:
+                        logger.debug(f"Skipping message with subtype: {msg.get('subtype')}")
+                        continue
+                        
+                    # Skip messages without text
+                    if not msg.get('text'):
+                        logger.debug("Skipping message without text")
+                        continue
+                        
+                    try:
+                        user_id = msg.get('user', 'unknown')
+                        user_name = await self._get_user_name(user_id)
+                        msg['user_name'] = user_name
+                        # Convert user mentions in the message text and ensure user_name is used
+                        msg['text'] = await self._convert_user_mentions(msg.get('text', ''))
+                        msg['user'] = user_name  # Replace user ID with name
+                        all_messages.append(msg)
+                    except Exception as e:
+                        logger.error(f"Error processing message: {e}")
+                        continue
                 
-                all_messages.extend(messages)
-                
-                logger.info(f"Retrieved {len(messages)} messages on page {page}")
+                logger.info(f"Retrieved and processed {len(messages)} messages on page {page}")
                 
                 if not response['has_more']:
                     break
@@ -467,7 +492,7 @@ class TasterayBot:
                 logger.error(f"Error getting channel history on page {page}: {e}")
                 break
         
-        logger.info(f"Total messages retrieved: {len(all_messages)}")
+        logger.info(f"Total valid messages retrieved: {len(all_messages)}")
         return all_messages
 
     async def _analyze_message(self, text: str, context: List[Dict]) -> dict:
@@ -499,58 +524,31 @@ class TasterayBot:
                 "content": (
                     f"You are Jane, an intelligent internal assistant for Tasteray - an AI-powered movie recommendation platform. "
                     f"Today's date is {current_date}.\n\n"
-                    "Key Information:\n"
-                    "1. You are designed to help with various tasks including news gathering, channel summarization, and general assistance\n"
-                    "2. You should be helpful, clear, and informative in your responses.\n"
-                    "3. You are fully bilingual in English and Polish - you should:\n"
-                    "   - Understand commands in both languages\n"
-                    "   - Detect the language of the user's message and respond in the same language\n"
-                    "   - Handle Polish commands like 'podsumuj', 'wiadomości', 'pomoc'\n"
-                    "   - Understand Polish date formats and convert them appropriately\n"
-                    "4. You should maintain conversation context and refer to previous messages when relevant\n"
-                    "5. You should provide detailed explanations when asked\n\n"
-                    "Available Functions:\n"
-                    "1. news/wiadomości: Get news articles\n"
-                    "   Parameters (always use English names):\n"
-                    "   - from_date: Start date (YYYY-MM-DD)\n"
-                    "   - to_date: End date (YYYY-MM-DD)\n"
-                    "   - keywords: List of search terms\n"
-                    "   - articles_per_keyword: Number of articles per keyword\n\n"
-                    "2. summarize/podsumuj: Summarize channel content\n"
-                    "   Parameters (always use English names):\n"
-                    "   - channel: Channel to summarize (convert 'ten kanał' to 'this channel')\n"
-                    "   - from_date: Start date (YYYY-MM-DD, optional)\n"
-                    "   - to_date: End date (YYYY-MM-DD, optional)\n\n"
-                    "3. task/zadanie: Create ClickUp task\n"
-                    "   Parameters (always use English names):\n"
-                    "   - list_name: Name of the list (e.g., 'o:produkt')\n"
-                    "   - task_name: Name of the task (required)\n"
-                    "   - status: Task status (always in English: 'Open', 'In Progress', 'Done')\n"
-                    "   - assignees: List of people to assign (can be Slack mentions, names, or emails)\n"
-                    "   - due_date: Due date (YYYY-MM-DD)\n"
-                    "   - priority: Priority level (1: Urgent, 2: High, 3: Normal, 4: Low)\n"
-                    "   - description: Task description\n\n"
-                    "4. help/pomoc: Show available commands\n"
-                    "5. delete_last/usuń ostatnią: Delete last message\n"
-                    "6. conversation: General chat and assistance\n\n"
+                    "Key Capabilities:\n"
+                    "1. Channel Summarization: You can analyze and summarize conversations in any channel\n"
+                    "2. News Gathering: You can find and share relevant news articles\n"
+                    "3. Task Management: You can create and manage tasks in ClickUp\n"
+                    "4. General Assistance: You can help with questions, provide information, and engage in conversation\n\n"
+                    "Language Capabilities:\n"
+                    "- You are fully bilingual in English and Polish\n"
+                    "- Detect and respond in the same language as the user\n"
+                    "- Handle requests naturally in both languages\n"
+                    "- Understand dates and references in both languages\n\n"
+                    "Interaction Guidelines:\n"
+                    "1. Maintain conversation context and reference previous messages when relevant\n"
+                    "2. Provide clear explanations for your actions\n"
+                    "3. Ask for clarification if a request is ambiguous\n"
+                    "4. Be forgiving with typos and informal language\n"
+                    "5. Format responses for readability in Slack\n\n"
                     "Response Format:\n"
-                    "Always respond with this JSON structure, using ENGLISH function names and parameter names:\n"
+                    "Return a JSON with these fields (always use English field names):\n"
                     "{\n"
-                    "  \"function\": \"news\" or \"summarize\" or \"task\" or \"help\" or \"delete_last\" or \"direct_response\",\n"
-                    "  \"parameters\": {key-value pairs for the function, always in English},\n"
-                    "  \"response\": \"Your conversational response in the same language as the user's message\"\n"
+                    "  \"function\": The main action to take (summarize/news/task/help/delete_last/direct_response),\n"
+                    "  \"parameters\": Required parameters for the action,\n"
+                    "  \"response\": Your conversational response in the user's language\n"
                     "}\n\n"
-                    "Response Guidelines:\n"
-                    "1. Always consider the conversation context\n"
-                    "2. Reference previous messages when relevant\n"
-                    "3. Provide clear explanations for your actions\n"
-                    "4. Use proper formatting for better readability\n"
-                    "5. Ask for clarification if a request is ambiguous\n"
-                    "6. Include relevant timestamps when referencing past messages\n"
-                    "7. Detect and respond in the same language as the user\n"
-                    "8. IMPORTANT: Always use English for function names and parameters\n"
-                    "9. For tasks, try to infer assignees from context when not explicitly specified\n"
-                    "10. Be forgiving with typos and informal references\n\n"
+                    "For summarization requests, include any special focus or instructions (e.g., 'focus on decisions', 'highlight technical details') "
+                    "in the parameters as 'summary_note'."
                 )
             },
             {
@@ -644,11 +642,12 @@ class TasterayBot:
         # This is a placeholder - implement actual news gathering logic
         return "News gathering not implemented yet."
         
-    async def _get_summary(self, channel: str = None, from_date: str = None, to_date: str = None) -> str:
+    async def _get_summary(self, channel: str = None, from_date: str = None, to_date: str = None, summary_note: str = None) -> str:
         """Get channel summary for the specified time range."""
         logger.info(f"Getting summary for channel {channel}" +
                    (f" from {from_date}" if from_date else "") +
-                   (f" to {to_date}" if to_date else ""))
+                   (f" to {to_date}" if to_date else "") +
+                   (f" with note: {summary_note}" if summary_note else ""))
 
         # Detect language from the request (if channel contains Polish words, use Polish)
         request_language = 'pl' if any(word in str(channel).lower() for word in ['kanał', 'kanal', 'ten']) else 'en'
@@ -693,7 +692,7 @@ class TasterayBot:
                     "Nieprawidłowy format daty końcowej. Proszę użyć formatu RRRR-MM-DD."
                 )
 
-        summary = await self._summarize_channel(channel_id, oldest, latest, request_language)
+        summary = await self._summarize_channel(channel_id, oldest, latest, request_language, summary_note)
         
         # Format the header with proper Slack markdown
         header_parts = []
@@ -712,6 +711,10 @@ class TasterayBot:
             if to_date:
                 date_range.append(f"{'do' if request_language == 'pl' else 'to'} {to_date}")
             header_parts.append(f"_({' '.join(date_range)})_")
+        
+        # Add summary note if specified
+        if summary_note:
+            header_parts.append(f"_({summary_note})_")
         
         # Combine header with summary
         return f"{' '.join(header_parts)}\n\n{summary}"
@@ -812,7 +815,8 @@ class TasterayBot:
                 summary = await self._get_summary(
                     channel=parameters.get('channel', channel),
                     from_date=parameters.get('from_date'),
-                    to_date=parameters.get('to_date')
+                    to_date=parameters.get('to_date'),
+                    summary_note=parameters.get('summary_note')
                 )
                 await self._post_message(channel, summary, thread_ts)
                 
@@ -850,7 +854,7 @@ class TasterayBot:
         """Split messages into manageable chunks for the LLM."""
         return [messages[i:i + chunk_size] for i in range(0, len(messages), chunk_size)]
 
-    async def _summarize_chunk(self, messages: List[Dict], is_dm: bool = False, request_language: str = 'en') -> str:
+    async def _summarize_chunk(self, messages: List[Dict], is_dm: bool = False, request_language: str = 'en', summary_note: str = None) -> str:
         """
         Summarize a chunk of messages using LLM.
         
@@ -858,6 +862,7 @@ class TasterayBot:
             messages: List of messages to summarize
             is_dm: Whether this is a DM conversation
             request_language: Language to use for the summary ('en' or 'pl')
+            summary_note: Special instructions for summarization
         """
         formatted_messages = []
         for msg in messages:
@@ -910,9 +915,12 @@ class TasterayBot:
             "\n4. Pay attention to technical details and specifications"
             "\n5. Note any action items or future plans"
             "\n6. When an idea or suggestion is significant, attribute it to its author"
-            "\n\nStructure your summary with these sections:\n"
-            f"{sections}"
         )
+
+        if summary_note:
+            system_content += f"\n\nSpecial instruction: {summary_note}"
+
+        system_content += f"\n\nStructure your summary with these sections:\n{sections}"
 
         messages = [
             {
@@ -942,7 +950,7 @@ class TasterayBot:
             logger.error(f"Failed to summarize chunk: {e}")
             return ""
 
-    async def _summarize_channel(self, channel: str, oldest: str = None, latest: str = None, request_language: str = 'en') -> str:
+    async def _summarize_channel(self, channel: str, oldest: str = None, latest: str = None, request_language: str = 'en', summary_note: str = None) -> str:
         """
         Summarize channel history with specified time range.
         
@@ -951,6 +959,7 @@ class TasterayBot:
             oldest: Oldest timestamp to include
             latest: Latest timestamp to include
             request_language: Language to use for the summary ('en' or 'pl')
+            summary_note: Special instructions for summarization
         """
         # Determine if this is a DM channel
         try:
@@ -960,6 +969,8 @@ class TasterayBot:
             is_dm = False
         
         logger.info(f"Summarizing {'DM' if is_dm else 'channel'} history in {request_language}")
+        if summary_note:
+            logger.info(f"Summary note: {summary_note}")
         
         # Get channel history
         messages = await self._get_channel_history(channel, oldest, latest)
@@ -976,7 +987,7 @@ class TasterayBot:
 
         # Process each chunk
         for i, chunk in enumerate(chunks, 1):
-            summary = await self._summarize_chunk(chunk, is_dm=is_dm, request_language=request_language)
+            summary = await self._summarize_chunk(chunk, is_dm=is_dm, request_language=request_language, summary_note=summary_note)
             if summary:
                 # Format each chunk summary with a timestamp range
                 start_ts = datetime.fromtimestamp(float(chunk[0]['ts'])).strftime('%Y-%m-%d %H:%M')
@@ -1049,6 +1060,7 @@ class TasterayBot:
                             "Structure your response with these sections:\n\n"
                             f"{sections}\n\n"
                             f"{instructions}"
+                            + (f"\n\nSpecial instruction: {summary_note}" if summary_note else "")
                         )
                     },
                     {
@@ -1087,6 +1099,7 @@ class TasterayBot:
                                 "Create a high-level summary of the entire conversation period, "
                                 "focusing on the most important developments, decisions, and trends. "
                                 f"Provide the summary in {'Polish' if request_language == 'pl' else 'English'}"
+                                + (f"\n\nSpecial instruction: {summary_note}" if summary_note else "")
                             )
                         },
                         {
