@@ -552,6 +552,21 @@ class TasterayBot:
                     "  \"parameters\": Required parameters for the action,\n"
                     "  \"response\": Your conversational response in the user's language\n"
                     "}\n\n"
+                    "For task creation requests, parameters should include:\n"
+                    "{\n"
+                    "  \"task_name\": Required. Extract from first meaningful part of message or use first line of description,\n"
+                    "  \"list_name\": One of: o:produkt (default), o:growth, bugtracker-www, bugtracker-app, deep-backlog, operacyjna-back, insights,\n"
+                    "  \"assignees\": Array of user references (names, mentions, or self-references like 'me'),\n"
+                    "  \"status\": Task status if specified (e.g., 'current sprint', 'backlog', etc.),\n"
+                    "  \"priority\": Priority level if specified (1: Urgent, 2: High, 3: Normal, 4: Low),\n"
+                    "  \"description\": Full task description with all relevant details\n"
+                    "}\n\n"
+                    "When analyzing task requests:\n"
+                    "1. Always set task_name - use first meaningful part of message or first line of description\n"
+                    "2. Include full context from conversation when relevant\n"
+                    "3. Map informal list references (e.g., 'product' -> 'o:produkt', 'bugs' -> 'bugtracker-www')\n"
+                    "4. Handle self-references ('me', 'my', etc.) in assignees\n"
+                    "5. Extract priority from urgency indicators ('urgent', 'high priority', etc.)\n\n"
                     "For summarization requests, include any special focus or instructions (e.g., 'focus on decisions', 'highlight technical details') "
                     "in the parameters as 'summary_note'."
                 )
@@ -1654,11 +1669,24 @@ class TasterayBot:
             logger.error(f"Error getting list statuses: {e}")
             return []
 
-    async def _create_clickup_task(self, list_name: str, task_name: str, status: str = None,
+    async def _create_clickup_task(self, list_name: str, task_name: str = None, status: str = None,
                                assignees: List[str] = None, due_date: str = None,
                                priority: int = None, description: str = None) -> Dict[str, Any]:
         """Create a task in ClickUp."""
         try:
+            # Ensure we have a valid task name
+            if not task_name:
+                if description:
+                    # Extract first line or first meaningful part of description as task name
+                    lines = [line.strip() for line in description.split('\n') if line.strip()]
+                    task_name = lines[0][:100] if lines else "New Task"
+                else:
+                task_name = "New Task"  # Default fallback name
+            
+            # Ensure task name is not too long
+            if len(task_name) > 500:  # ClickUp's limit
+                task_name = task_name[:497] + "..."
+                
             # Let the LLM match the list name to the correct one
             messages = [
                 {
