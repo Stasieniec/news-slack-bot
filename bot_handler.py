@@ -557,10 +557,24 @@ class TasterayBot:
                     "  \"task_name\": Required. Extract from first meaningful part of message or use first line of description,\n"
                     "  \"list_name\": One of: o:produkt (default), o:growth, bugtracker-www, bugtracker-app, deep-backlog, operacyjna-back, insights,\n"
                     "  \"assignees\": Array of user references (names, mentions, or self-references like 'me'),\n"
-                    "  \"status\": Task status if specified (e.g., 'current sprint', 'backlog', etc.),\n"
+                    "  \"status\": Task status if specified (e.g., 'current sprint', 'log', etc.),\n"
                     "  \"priority\": Priority level if specified (1: Urgent, 2: High, 3: Normal, 4: Low),\n"
                     "  \"description\": Full task description with all relevant details\n"
                     "}\n\n"
+                    "List and Status Combinations:\n"
+                    "1. When user mentions 'backlog', choose one of:\n"
+                    "   - o:produkt list with 'log' status\n"
+                    "   - o:growth list with 'log' status\n"
+                    "   - deep-backlog list (any status)\n"
+                    "   Choose based on task context (product vs growth vs future tasks)\n\n"
+                    "2. Available statuses per list:\n"
+                    "   - o:produkt: log, sprint+2, next sprint, current sprint, in progress, ready for testing, ready for prod, done, complete\n"
+                    "   - o:growth: log, sprint+2, next sprint, current sprint, in progress, ready for testing, ready for prod, done, complete\n"
+                    "   - bugtracker-www: new, odnotowany, w badaniu, potwierdzony, gotowy do testów, complete\n"
+                    "   - bugtracker-app: new, odnotowany, w badaniu, potwierdzony, gotowy do testów, complete\n"
+                    "   - deep-backlog: backlog, in progress, done\n"
+                    "   - operacyjna-back: new, in progress, done\n"
+                    "   - insights: new, in progress, done\n\n"
                     "When analyzing task requests:\n"
                     "1. Always set task_name - use first meaningful part of message or first line of description\n"
                     "2. Include full context from conversation when relevant\n"
@@ -795,43 +809,62 @@ class TasterayBot:
             
             if function == 'task':
                 # Create task in ClickUp
-                task_result = await self._create_clickup_task(
-                    list_name=parameters.get('list_name', 'o:produkt'),
-                    task_name=parameters.get('task_name'),
-                    status=parameters.get('status'),
-                    assignees=parameters.get('assignees'),
-                    due_date=parameters.get('due_date'),
-                    priority=parameters.get('priority'),
-                    description=parameters.get('description')
-                )
-                
-                # Format the response
-                list_name = parameters.get('list_name', 'o:produkt')
-                status_text = task_result.get('status', {}).get('status', 'Not set')
-                priority_text = task_result.get('priority', {}).get('priority', 'Not set')
-                
-                # Format assignee names
-                assignee_names = []
-                if parameters.get('assignees'):
-                    for assignee_id in parameters['assignees']:
-                        user_info = apis.CLICKUP_USER_INFO.get(assignee_id)
-                        if user_info:
-                            assignee_names.append(user_info['name'])
-                
-                response_text = (
-                    f"✅ Task created successfully!\n"
-                    f"*Task:* {task_result['name']}\n"
-                    f"*List:* {list_name}\n"
-                    f"*Status:* {status_text}\n"
-                    f"*Priority:* {priority_text}\n"
-                )
-                
-                if assignee_names:
-                    response_text += f"*Assigned to:* {', '.join(assignee_names)}\n"
-                
-                response_text += f"*URL:* {task_result['url']}"
-                
-                await self._post_message(channel, response_text, thread_ts)
+                try:
+                    task_result = await self._create_clickup_task(
+                        list_name=parameters.get('list_name', 'o:produkt'),
+                        task_name=parameters.get('task_name'),
+                        status=parameters.get('status'),
+                        assignees=parameters.get('assignees'),
+                        due_date=parameters.get('due_date'),
+                        priority=parameters.get('priority'),
+                        description=parameters.get('description')
+                    )
+                    
+                    if not task_result:
+                        error_msg = "Failed to create task. Please try again or contact support."
+                        await self._post_message(channel, error_msg, thread_ts)
+                        return
+                        
+                    # Format the response
+                    list_name = parameters.get('list_name', 'o:produkt')
+                    
+                    # Get status and priority with safe defaults
+                    status_dict = task_result.get('status', {})
+                    status_text = status_dict.get('status', 'Not set') if isinstance(status_dict, dict) else str(status_dict)
+                    
+                    priority_dict = task_result.get('priority', {})
+                    priority_text = priority_dict.get('priority', 'Not set') if isinstance(priority_dict, dict) else str(priority_dict)
+                    
+                    # Format assignee names
+                    assignee_names = []
+                    if parameters.get('assignees'):
+                        for assignee_id in parameters['assignees']:
+                            user_info = apis.CLICKUP_USER_INFO.get(assignee_id)
+                            if user_info:
+                                assignee_names.append(user_info['name'])
+                    
+                    # Build response text with safe gets
+                    response_text = [
+                        "✅ Task created successfully!",
+                        f"*Task:* {task_result.get('name', 'Unnamed Task')}",
+                        f"*List:* {list_name}",
+                        f"*Status:* {status_text}"
+                    ]
+                    
+                    if priority_text and priority_text != 'Not set':
+                        response_text.append(f"*Priority:* {priority_text}")
+                    
+                    if assignee_names:
+                        response_text.append(f"*Assigned to:* {', '.join(assignee_names)}")
+                    
+                    response_text.append(f"*URL:* {task_result.get('url', 'No URL available')}")
+                    
+                    await self._post_message(channel, "\n".join(response_text), thread_ts)
+                        
+                except Exception as e:
+                    logger.error(f"Error creating task: {e}")
+                    error_msg = f"Error creating task: {str(e)}"
+                    await self._post_message(channel, error_msg, thread_ts)
                 
             elif function == 'summarize':
                 # Handle channel summary
@@ -1692,35 +1725,55 @@ class TasterayBot:
                 {
                     "role": "system",
                     "content": (
-                        "You are a list matcher that maps informal list references to their correct ClickUp list names. "
+                        "You are a list matcher that maps informal list references to their correct ClickUp list names and statuses. "
                         "Return your response in JSON format.\n\n"
-                        "Available ClickUp lists:\n"
-                        "- o:produkt: Main product development list\n"
-                        "- o:growth: Growth and marketing initiatives\n"
-                        "- bugtracker-www: Website bugs and issues\n"
-                        "- bugtracker-app: Mobile app bugs and issues\n"
-                        "- deep-backlog: General backlog for future tasks\n"
-                        "- operacyjna-back: Backend operations tasks\n"
-                        "- insights: Data and analytics tasks\n\n"
-                        "Common variations:\n"
-                        "- produkt, product, produktu → o:produkt\n"
-                        "- growth, wzrost → o:growth\n"
-                        "- bugs, website bugs, www → bugtracker-www\n"
-                        "- app bugs, mobile → bugtracker-app\n"
-                        "- backlog, deep backlog → deep-backlog\n"
-                        "- operations, ops, backend → operacyjna-back\n"
-                        "- insights, analityka → insights\n\n"
-                        "Return JSON with a single field 'list_name' containing the matched list name.\n"
-                        "If no match is found, use 'o:produkt' as the default.\n\n"
+                        "Available ClickUp lists and their statuses:\n"
+                        "1. o:produkt (Product Development):\n"
+                        "   - Statuses: log, sprint+2, next sprint, current sprint, in progress, ready for testing, ready for prod, done, complete\n"
+                        "   - Use for: Core product features and improvements\n\n"
+                        "2. o:growth (Growth & Marketing):\n"
+                        "   - Statuses: log, sprint+2, next sprint, current sprint, in progress, ready for testing, ready for prod, done, complete\n"
+                        "   - Use for: Growth initiatives and marketing tasks\n\n"
+                        "3. bugtracker-www (Website Bugs):\n"
+                        "   - Statuses: new, odnotowany, w badaniu, potwierdzony, gotowy do testów, complete\n"
+                        "   - Use for: Website-specific issues\n\n"
+                        "4. bugtracker-app (Mobile App Bugs):\n"
+                        "   - Statuses: new, odnotowany, w badaniu, potwierdzony, gotowy do testów, complete\n"
+                        "   - Use for: Mobile app-specific issues\n\n"
+                        "5. deep-backlog (Future Tasks):\n"
+                        "   - Statuses: backlog, in progress, done\n"
+                        "   - Use for: Long-term ideas and future tasks\n\n"
+                        "6. operacyjna-back (Backend Operations):\n"
+                        "   - Statuses: new, in progress, done\n"
+                        "   - Use for: Backend and operational tasks\n\n"
+                        "7. insights (Analytics):\n"
+                        "   - Statuses: new, in progress, done\n"
+                        "   - Use for: Data analysis and insights tasks\n\n"
+                        "Special Cases:\n"
+                        "1. When user mentions 'backlog', choose one of:\n"
+                        "   - o:produkt with 'log' status (for product features)\n"
+                        "   - o:growth with 'log' status (for growth/marketing tasks)\n"
+                        "   - deep-backlog list (for future/unplanned tasks)\n"
+                        "   Choose based on task context and description\n\n"
+                        "Return JSON with these fields:\n"
+                        "{\n"
+                        "  \"list_name\": The matched list name,\n"
+                        "  \"status\": The appropriate status for this list\n"
+                        "}\n\n"
                         "Example response:\n"
                         "{\n"
-                        "  \"list_name\": \"o:produkt\"\n"
+                        "  \"list_name\": \"o:produkt\",\n"
+                        "  \"status\": \"current sprint\"\n"
                         "}"
                     )
                 },
                 {
                     "role": "user",
-                    "content": list_name
+                    "content": (
+                        f"List reference: {list_name}\n"
+                        f"Status reference: {status}\n"
+                        f"Task description: {description}"
+                    )
                 }
             ]
             
@@ -1735,13 +1788,17 @@ class TasterayBot:
                 
                 parsed = json.loads(response.choices[0].message.content)
                 matched_list = parsed.get('list_name', 'o:produkt')
-                logger.info(f"LLM matched list '{list_name}' to '{matched_list}'")
+                matched_status = parsed.get('status')  # Get the matched status
+                logger.info(f"LLM matched list '{list_name}' to '{matched_list}' with status '{matched_status}'")
                 
                 if matched_list not in apis.CLICKUP_LISTS:
                     logger.warning(f"LLM returned invalid list name: {matched_list}, falling back to o:produkt")
                     matched_list = 'o:produkt'
+                    matched_status = None
                 
                 list_name = matched_list
+                if matched_status:
+                    status = matched_status  # Override the status if LLM provided one
             except Exception as e:
                 logger.error(f"Error matching list name: {e}")
                 # Fall back to o:produkt if there's an error
@@ -1781,18 +1838,11 @@ class TasterayBot:
             if task_status not in available_statuses and available_statuses:
                 task_status = available_statuses[0]
 
-            # Create the task
-            url = f"https://api.clickup.com/api/v2/list/{list_id}/task"
-            
-            # Prepare the payload
-            payload = {
-                "name": task_name,
-                "status": task_status
-            }
+            # Initialize clickup_assignees
+            clickup_assignees = []
             
             # Handle assignees
             if assignees:
-                clickup_assignees = []
                 # Create a list of all available users for the LLM
                 available_users = []
                 for key, value in self.user_cache.items():
@@ -1852,12 +1902,17 @@ class TasterayBot:
                     except Exception as e:
                         logger.error(f"Error matching user with LLM: {e}")
                 
-                if clickup_assignees:
-                    logger.info(f"Setting assignees: {clickup_assignees}")
-                    payload["assignees"] = clickup_assignees
-                else:
-                    logger.warning(f"Could not map any assignees: {assignees}")
-                
+            # Prepare the payload after all processing
+            payload = {
+                "name": task_name,
+                "status": task_status
+            }
+
+            # Add optional fields to payload
+            if clickup_assignees:
+                logger.info(f"Setting assignees: {clickup_assignees}")
+                payload["assignees"] = clickup_assignees
+            
             if due_date:
                 payload["due_date"] = int(datetime.strptime(due_date, "%Y-%m-%d").timestamp() * 1000)
             if priority:
@@ -1870,6 +1925,9 @@ class TasterayBot:
                 "Content-Type": "application/json"
             }
             
+            # Create the task URL
+            url = f"https://api.clickup.com/api/v2/list/{list_id}/task"
+            
             logger.info(f"Sending task creation request with payload: {payload}")
             async with aiohttp.ClientSession() as session:
                 async with session.post(url, json=payload, headers=headers) as response:
@@ -1877,18 +1935,39 @@ class TasterayBot:
                     if response.status == 200:
                         try:
                             data = json.loads(response_text)
-                            # Verify the assignees were set correctly
+                            # Verify we have the minimum required fields
+                            if not data.get('name'):
+                                logger.error("Task created but missing name field")
+                                raise Exception("Invalid response from ClickUp: missing task name")
+                            
+                            # Verify the assignees were set correctly if requested
                             actual_assignees = data.get('assignees', [])
                             if clickup_assignees and not actual_assignees:
                                 logger.error(f"Task created but assignees not set. Response: {response_text}")
                                 raise Exception("Task created but assignees were not set correctly")
+                                
+                            # Add default values for optional fields if missing
+                            if 'status' not in data:
+                                data['status'] = {'status': task_status}
+                            if 'priority' not in data:
+                                data['priority'] = {'priority': 'Not set'}
+                            if 'url' not in data:
+                                data['url'] = 'No URL available'
+                                
                             return data
                         except json.JSONDecodeError as e:
                             logger.error(f"Invalid JSON response: {response_text}")
                             raise Exception(f"Invalid response from ClickUp: {e}")
                     else:
                         logger.error(f"Error creating task. Status: {response.status}, Response: {response_text}")
-                        raise Exception(f"Error creating task: {response_text}")
+                        error_msg = "Unknown error"
+                        try:
+                            error_data = json.loads(response_text)
+                            if 'err' in error_data:
+                                error_msg = error_data['err']
+                        except:
+                            error_msg = response_text
+                        raise Exception(f"Error creating task: {error_msg}")
                         
         except ValueError as e:
             available_lists = "\n• ".join(apis.CLICKUP_LISTS.keys())
