@@ -1681,7 +1681,7 @@ class TasterayBot:
                     lines = [line.strip() for line in description.split('\n') if line.strip()]
                     task_name = lines[0][:100] if lines else "New Task"
                 else:
-                task_name = "New Task"  # Default fallback name
+                    task_name = "New Task"  # Default fallback name
             
             # Ensure task name is not too long
             if len(task_name) > 500:  # ClickUp's limit
