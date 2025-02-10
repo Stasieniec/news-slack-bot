@@ -20,15 +20,19 @@ source venv/bin/activate
 echo "Starting bot processes..."
 echo "----------------------------------------"
 
-# Start both processes and combine their output
-(python scheduler.py | tee "$LOG_DIR/scheduler.log") & \
-(python app.py | tee "$LOG_DIR/app.log") &
+# Start both processes with nohup to keep them running after terminal closes
+nohup python scheduler.py > "$LOG_DIR/scheduler.log" 2>&1 &
+SCHEDULER_PID=$!
+echo $SCHEDULER_PID > "$LOG_DIR/scheduler.pid"
 
-# Store PIDs for potential later use
-echo $! > "$LOG_DIR/app.pid"
+nohup python app.py > "$LOG_DIR/app.log" 2>&1 &
+APP_PID=$!
+echo $APP_PID > "$LOG_DIR/app.pid"
 
-echo "Bot processes started. Showing live logs below:"
+echo "Bot processes started with PIDs:"
+echo "Scheduler PID: $SCHEDULER_PID"
+echo "App PID: $APP_PID"
 echo "----------------------------------------"
-
-# Use tail to follow both log files in real-time
-tail -f "$LOG_DIR/scheduler.log" "$LOG_DIR/app.log"
+echo "You can check the logs in $LOG_DIR"
+echo "To view logs in real-time, use:"
+echo "tail -f $LOG_DIR/scheduler.log $LOG_DIR/app.log"
